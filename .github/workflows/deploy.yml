@@ -1,0 +1,97 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Create release directory
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          ssh deploy@"$DEPLOY_HOST" \
+            "mkdir -p /var/www/contact-manager/releases/$RELEASE_SHA"
+
+      - name: Upload release
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          rsync -az --delete --no-owner --no-group \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.env' \
+            --exclude='node_modules' \
+            --exclude='vendor' \
+            --exclude='tests' \
+            --exclude='docs' \
+            -e ssh \
+            ./ deploy@"$DEPLOY_HOST":/var/www/contact-manager/releases/"$RELEASE_SHA"/
+
+      - name: Activate release
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          ssh deploy@"$DEPLOY_HOST" "
+            set -e
+
+            RELEASE=/var/www/contact-manager/releases/$RELEASE_SHA
+
+            cd \"\$RELEASE\"
+
+            composer install \
+              --no-dev \
+              --no-interaction \
+              --prefer-dist \
+              --no-progress \
+              --optimize-autoloader
+
+            ln -sfn /var/www/contact-manager/shared/.env \"\$RELEASE/.env\"
+            ln -sfn \"\$RELEASE\" /var/www/contact-manager/current
+
+            cd /var/www/contact-manager
+            ls -1dt releases/* 2>/dev/null | tail -n +6 | xargs -r rm -rf
+          "
+
+      - name: Verify deployment
+        env:
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+        run: curl --fail --silent --show-error "https://$DEPLOY_DOMAIN/" >/dev/null

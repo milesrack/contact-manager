@@ -1,0 +1,44 @@
+{
+  "name": "milesrack/contact-manager",
+  "description": "A personal contact manager web application built using the LAMP stack.",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": "^8.3",
+    "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
+    "vlucas/phpdotenv": "^5.7"
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.0",
+    "php-parallel-lint/php-parallel-lint": "^1.4",
+    "phpstan/phpstan": "^2.0",
+    "phpunit/phpunit": "^12.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "lint": "parallel-lint config public src tests",
+    "analyse": "phpstan analyse --no-progress",
+    "format": "php-cs-fixer fix",
+    "format:check": "php-cs-fixer fix --dry-run --diff",
+    "test": "phpunit",
+    "check": [
+      "@lint",
+      "@format:check",
+      "@analyse",
+      "@test"
+    ]
+  },
+  "config": {
+    "sort-packages": true
+  }
+}

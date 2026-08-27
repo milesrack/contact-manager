@@ -1,0 +1,52 @@
+name: Bug Report
+description: Report incorrect or unexpected behaviour
+title: ""
+
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What is wrong?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: How can another team member reproduce the issue?
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behaviour
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behaviour
+      description: What happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Where did the issue occur?
+      placeholder: |
+        Application: local or production
+        Browser: Chrome 140
+        OS: macOS 26
+    validations:
+      required: true

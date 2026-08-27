@@ -1,0 +1,7 @@
+vendor/
+node_modules/
+coverage/
+.phpunit.cache/
+composer.lock
+package-lock.json
+**/*.php

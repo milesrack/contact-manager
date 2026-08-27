@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/12.5/phpunit.xsd"
+bootstrap="config/bootstrap.php"
+colors="true"
+cacheDirectory=".phpunit.cache"
+failOnWarning="true"
+failOnRisky="true"
+>
+    <testsuites>
+        <testsuite name="default">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+
+    <source>
+        <include>
+            <directory>src</directory>
+        </include>
+    </source>
+
+    <php>
+        <env name="APP_ENV" value="test" force="true"/>
+        <env name="APP_URL" value="http://localhost" force="true"/>
+        <env name="DB_HOST" value="127.0.0.1" force="true"/>
+        <env name="DB_PORT" value="3306" force="true"/>
+        <env name="DB_NAME" value="contact_manager_test" force="true"/>
+        <env name="DB_USER" value="contact_manager_test" force="true"/>
+        <env name="DB_PASSWORD" value="contact_manager_test" force="true"/>
+    </php>
+</phpunit>
