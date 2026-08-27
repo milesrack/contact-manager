@@ -23,7 +23,9 @@ jobs:
 
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: production
+    environment:
+      name: production
+      url: https://${{ vars.DEPLOY_DOMAIN }}/
 
     steps:
       - name: Checkout tested commit
