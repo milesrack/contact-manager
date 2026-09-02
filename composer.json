@@ -26,7 +26,8 @@
     }
   },
   "scripts": {
-    "lint": "parallel-lint config public src tests",
+    "lint": "parallel-lint bin config public src tests",
+    "migrate": "php bin/migrate.php",
     "analyse": "phpstan analyse --no-progress",
     "format": "php-cs-fixer fix",
     "format:check": "php-cs-fixer fix --dry-run --diff",
