@@ -1,6 +1,5 @@
 name: Task
 description: Track development, testing, documentation, or infrastructure work
-title: ""
 
 body:
   - type: textarea
