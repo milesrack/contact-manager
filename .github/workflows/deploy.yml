@@ -87,6 +87,17 @@ jobs:
               --optimize-autoloader
 
             ln -sfn /var/www/contact-manager/shared/.env \"\$RELEASE/.env\"
+
+            test -r /etc/contact-manager/migration.env
+
+            (
+              set -a
+              . /etc/contact-manager/migration.env
+              set +a
+
+              php bin/migrate.php
+            )
+
             ln -sfn \"\$RELEASE\" /var/www/contact-manager/current
 
             cd /var/www/contact-manager

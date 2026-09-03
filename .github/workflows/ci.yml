@@ -62,6 +62,15 @@ jobs:
       - name: Install JavaScript tooling
         run: npm ci
 
+      - name: Apply database migrations
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: contact_manager_test
+          DB_USER: contact_manager_test
+          DB_PASSWORD: contact_manager_test
+        run: composer migrate
+
       - name: Check PHP
         run: composer check
 
