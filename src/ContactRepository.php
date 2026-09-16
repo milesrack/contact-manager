@@ -118,14 +118,14 @@ final class ContactRepository
     /**
      * @return list<array<string, mixed>>
      */
-    public function search(int $userId, string $query): array
+    public function search(int $userId, string $query, int $limit = 50, ?int $afterId = null): array
     {
         $searchTerm = '%' . $query . '%';
 
-        $statement = $this->pdo->prepare(
-            'SELECT contact_id, first_name, last_name, company, email, phone_number
-             FROM contacts
-             WHERE user_id = :user_id
+        $sql = '
+            SELECT contact_id, first_name, last_name, company, email, phone_number
+            FROM contacts
+            WHERE user_id = :user_id
                 AND (
                     first_name LIKE :first_name_query
                     OR last_name LIKE :last_name_query
@@ -133,17 +133,29 @@ final class ContactRepository
                     OR email LIKE :email_query
                     OR phone_number LIKE :phone_query
                 )
-             ORDER BY contact_id ASC',
-        );
+        ';
 
-        $statement->execute([
-            'user_id' => $userId,
-            'first_name_query' => $searchTerm,
-            'last_name_query' => $searchTerm,
-            'company_query' => $searchTerm,
-            'email_query' => $searchTerm,
-            'phone_query' => $searchTerm,
-        ]);
+        if ($afterId !== null) {
+            $sql .= ' AND contact_id > :after_id';
+        }
+
+        $sql .= ' ORDER BY contact_id ASC LIMIT :limit';
+
+        $statement = $this->pdo->prepare($sql);
+
+        $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $statement->bindValue(':first_name_query', $searchTerm);
+        $statement->bindValue(':last_name_query', $searchTerm);
+        $statement->bindValue(':company_query', $searchTerm);
+        $statement->bindValue(':email_query', $searchTerm);
+        $statement->bindValue(':phone_query', $searchTerm);
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+
+        if ($afterId !== null) {
+            $statement->bindValue(':after_id', $afterId, PDO::PARAM_INT);
+        }
+
+        $statement->execute();
 
         $results = $statement->fetchAll(PDO::FETCH_ASSOC);
 

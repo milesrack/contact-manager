@@ -317,4 +317,67 @@ final class ContactRepositoryTest extends TestCase
         self::assertNull($contact['company']);
         self::assertNull($contact['email']);
     }
+
+    public function testSearchRespectsLimit(): void
+    {
+        $userId = $this->createTestUser();
+
+        for ($i = 1; $i <= 5; ++$i) {
+            $this->contacts->create($userId, [
+                'first_name' => 'Test',
+                'last_name' => 'Contact' . $i,
+                'company' => '',
+                'email' => '',
+                'phone_number' => '4075550000' . $i,
+            ]);
+        }
+
+        $results = $this->contacts->search($userId, '', 2);
+
+        self::assertCount(2, $results);
+    }
+
+    public function testSearchSupportKeysetPagination(): void
+    {
+        $userId = $this->createTestUser();
+
+        $firstId = $this->contacts->create($userId, [
+            'first_name' => 'First',
+            'last_name' => 'Contact',
+            'company' => '',
+            'email' => '',
+            'phone_number' => '4075550001',
+        ]);
+
+        $secondId = $this->contacts->create($userId, [
+            'first_name' => 'Second',
+            'last_name' => 'Contact',
+            'company' => '',
+            'email' => '',
+            'phone_number' => '4075550002',
+        ]);
+
+        $thirdId = $this->contacts->create($userId, [
+            'first_name' => 'Third',
+            'last_name' => 'Contact',
+            'company' => '',
+            'email' => '',
+            'phone_number' => '4075550003',
+        ]);
+
+        $results = $this->contacts->search($userId, '', 50, $firstId);
+
+        self::assertCount(2, $results);
+        self::assertSame($secondId, (int) $results[0]['contact_id']);
+        self::assertSame($thirdId, (int) $results[1]['contact_id']);
+    }
+
+    public function testSearchReturnsEmptyArrayForNoMatch(): void
+    {
+        $userId = $this->createTestUser();
+
+        $results = $this->contacts->search($userId, 'does-not-exist');
+
+        self::assertSame([], $results);
+    }
 }
