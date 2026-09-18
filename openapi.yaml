@@ -1,0 +1,133 @@
+openapi: 3.0.3
+
+info:
+  title: Contact Manager API
+  version: 1.0.0
+  description: API for managing user contacts.
+
+paths:
+  /api/contacts:
+    get:
+      summary: Search contacts
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: after_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Contacts returned successfully.
+        "401":
+          description: Invalid user ID.
+        "422":
+          description: Invalid parameters.
+
+    post:
+      summary: Create a contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - first_name
+                - last_name
+                - phone_number
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                phone_number:
+                  type: string
+                company:
+                  type: string
+                  nullable: true
+                email:
+                  type: string
+                  nullable: true
+      responses:
+        "201":
+          description: Contact created successfully.
+        "401":
+          description: Invalid user ID.
+        "422":
+          description: Invalid contact data.
+
+  /api/contacts/{contact_id}:
+    put:
+      summary: Update a contact
+      parameters:
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - first_name
+                - last_name
+                - phone_number
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                phone_number:
+                  type: string
+                company:
+                  type: string
+                  nullable: true
+                email:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Contact updated successfully.
+        "401":
+          description: Invalid user ID.
+        "404":
+          description: Contact not found.
+        "422":
+          description: Invalid contact data.
+
+    delete:
+      summary: Delete a contact
+      parameters:
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Contact deleted successfully.
+        "401":
+          description: Invalid user ID.
+        "404":
+          description: Contact not found.
+        "422":
+          description: Invalid contact ID.
