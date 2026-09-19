@@ -29,7 +29,30 @@ class AuthController
         ]);
     }
 
-    public function loginUser(): void {}
+    public function loginUser(): void {
+        $creds = APIAuthUtil::grabAndValidateCredentials();
 
-    public function logoutUser(): void {}
+        if($creds === null) return;
+
+        $user = $creds["email"];
+        $pass = $creds["password"];
+
+        $account = $this->ur->findByEmail($user);
+        if($account === null || !password_verify($pass, $account["password_hash"])) {
+            APIAuthUtil::sendResponseCodeError(401, "Invalid Credentials");
+            return;
+        }
+
+        session_start();
+        session_regenerate_id(true);
+        $_SESSION["user_id"] = $account["user_id"];
+
+        APIAuthUtil::sendResponseCodeBody(200, [
+            "user_id" => $account["user_id"]
+        ]);
+    }
+
+    public function logoutUser(): void {
+
+    }
 }
