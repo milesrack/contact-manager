@@ -37,6 +37,7 @@ class APIAuthUtil
 
         return array("email" => $user, "password" => $pass);
     }
+
     public static function sendResponseCodeError(int $code, string $message, string $type = "error"): void {
         http_response_code($code);
         header('Content-Type: application/json');
