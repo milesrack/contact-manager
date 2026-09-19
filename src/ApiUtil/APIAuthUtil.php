@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Auth;
+namespace App\ApiUtil;
 
 class APIAuthUtil
 {
@@ -22,20 +22,20 @@ class APIAuthUtil
             return null;
         }
 
-        $user = $data["email"];
+        $email = $data["email"];
         $pass = $data["password"];
 
         //validate email & password
-        if(!is_string($user) || !filter_var($user, FILTER_VALIDATE_EMAIL)) {
+        if(!is_string($email)) {
             APIAuthUtil::sendResponseCodeError(422, "Please enter a valid email address.");
             return null;
         }
-        if(!is_string($pass) || trim($pass) === "") {
+        if(!is_string($pass)) {
             APIAuthUtil::sendResponseCodeError(422, "Please enter a valid password.");
             return null;
         }
 
-        return array("email" => $user, "password" => $pass);
+        return array("email" => $email, "password" => $pass);
     }
 
     public static function sendResponseCodeError(int $code, string $message, string $type = "error"): void {
