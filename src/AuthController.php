@@ -12,12 +12,13 @@ class AuthController
     /**
      * @throws JsonException
      */
-    public function registerUser(string $email, string $password): void {
-        if(!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    public function registerUser(string $email, string $password): void
+    {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             APIAuthUtil::sendResponseCodeError(422, "Please enter a valid email address.");
             return;
         }
-        if(trim($password) === "") {
+        if (trim($password) === "") {
             APIAuthUtil::sendResponseCodeError(422, "Please enter a valid password.");
             return;
         }
@@ -27,14 +28,15 @@ class AuthController
         $user_id = $this->ur->create($email, $hashedPass);
 
         APIAuthUtil::sendResponseCodeBody(201, [
-            "user_id" => $user_id
+            "user_id" => $user_id,
         ]);
     }
 
-    public function loginUser(string $email, string $password): void {
+    public function loginUser(string $email, string $password): void
+    {
         $account = $this->ur->findByEmail($email);
 
-        if($account === null || !password_verify($password, $account["password_hash"])) {
+        if ($account === null || !password_verify($password, $account["password_hash"])) {
             APIAuthUtil::sendResponseCodeError(401, "Invalid Credentials");
             return;
         }
@@ -44,17 +46,18 @@ class AuthController
         $_SESSION["user_id"] = $account["user_id"];
 
         APIAuthUtil::sendResponseCodeBody(200, [
-            "user_id" => $account["user_id"]
+            "user_id" => $account["user_id"],
         ]);
     }
 
-    public function logoutUser(): void {
+    public function logoutUser(): void
+    {
         session_start();
         $_SESSION = [];
         session_destroy();
 
         APIAuthUtil::sendResponseCodeBody(200, [
-            "success" => true
+            "success" => true,
         ]);
     }
 }
