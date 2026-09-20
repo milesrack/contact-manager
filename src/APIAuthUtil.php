@@ -1,14 +1,22 @@
 <?php
 
-namespace App\ApiUtil;
+namespace App;
 
 class APIAuthUtil
 {
     public function __construct() {}
 
+    /**
+     * @return array{email: string, password: string}|null
+     */
     public static function grabAndValidateCredentials(): ?array
     {
         $json = file_get_contents('php://input');
+
+        if ($json === false) {
+            APIAuthUtil::sendResponseCodeError(500, "Unable to read request body");
+            return null;
+        }
 
         try {
             $data = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
@@ -49,6 +57,9 @@ class APIAuthUtil
         ]);
     }
 
+    /**
+     * @param array<string, mixed> $body
+     */
     public static function sendResponseCodeBody(int $code, array $body): void
     {
         http_response_code($code);
