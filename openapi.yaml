@@ -9,10 +9,12 @@ paths:
   /api/contacts:
     get:
       summary: Search contacts
+      security:
+        - sessionCookie: []
       parameters:
         - name: query
           in: query
-          required: true
+          required: false
           schema:
             type: string
         - name: limit
@@ -31,48 +33,43 @@ paths:
             minimum: 1
       responses:
         "200":
-          description: Contacts returned successfully.
+          $ref: "#/components/responses/ContactSearchResponse"
         "401":
-          description: Invalid user ID.
+          $ref: "#/components/responses/Unauthorized"
         "422":
-          description: Invalid parameters.
+          $ref: "#/components/responses/ValidationError"
+        "400":
+          $ref: "#/components/responses/BadRequestUri"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
     post:
       summary: Create a contact
+      security:
+        - sessionCookie: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - first_name
-                - last_name
-                - phone_number
-              properties:
-                first_name:
-                  type: string
-                last_name:
-                  type: string
-                phone_number:
-                  type: string
-                company:
-                  type: string
-                  nullable: true
-                email:
-                  type: string
-                  nullable: true
+              $ref: "#/components/schemas/ContactInput"
       responses:
         "201":
-          description: Contact created successfully.
+          $ref: "#/components/responses/ContactCreateResponse"
         "401":
-          description: Invalid user ID.
+          $ref: "#/components/responses/Unauthorized"
         "422":
-          description: Invalid contact data.
+          $ref: "#/components/responses/ValidationError"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/contacts/{contact_id}:
-    put:
+    patch:
       summary: Update a contact
+      security:
+        - sessionCookie: []
       parameters:
         - name: contact_id
           in: path
@@ -85,36 +82,25 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - first_name
-                - last_name
-                - phone_number
-              properties:
-                first_name:
-                  type: string
-                last_name:
-                  type: string
-                phone_number:
-                  type: string
-                company:
-                  type: string
-                  nullable: true
-                email:
-                  type: string
-                  nullable: true
+              $ref: "#/components/schemas/ContactInput"
       responses:
         "200":
-          description: Contact updated successfully.
+          $ref: "#/components/responses/ContactSuccessResponse"
         "401":
-          description: Invalid user ID.
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: Contact not found.
+          $ref: "#/components/responses/NotFound"
         "422":
-          description: Invalid contact data.
+          $ref: "#/components/responses/ValidationError"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
     delete:
       summary: Delete a contact
+      security:
+        - sessionCookie: []
       parameters:
         - name: contact_id
           in: path
@@ -124,10 +110,203 @@ paths:
             minimum: 1
       responses:
         "200":
-          description: Contact deleted successfully.
+          $ref: "#/components/responses/ContactSuccessResponse"
         "401":
-          description: Invalid user ID.
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: Contact not found.
+          $ref: "#/components/responses/NotFound"
         "422":
-          description: Invalid contact ID.
+          $ref: "#/components/responses/ValidationError"
+        "400":
+          $ref: "#/components/responses/BadRequestUri"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  responses:
+    ContactSearchResponse:
+      description: Successful contact search
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - contacts
+            properties:
+              contacts:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContactOutput"
+          example:
+            contacts:
+              - contact_id: 123
+                first_name: "John"
+                last_name: "Smith"
+                company: "Example Inc."
+                email: "john.smith@example.com"
+                phone_number: "555-123-4567"
+
+    ContactCreateResponse:
+      description: Contact created successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - contact_id
+            properties:
+              contact_id:
+                type: integer
+          example:
+            contact_id: 123
+
+    ContactSuccessResponse:
+      description: Contact operation completed successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - success
+            properties:
+              success:
+                type: boolean
+          example:
+            success: true
+
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            malformed_json:
+              value:
+                error: "Malformed JSON"
+            invalid_request_body:
+              value:
+                error: "Unable to read request body"
+            invalid_request_uri:
+              value:
+                error: "Invalid request URI"
+
+    BadRequestUri:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Invalid request URI"
+
+    Unauthorized:
+      description: Missing or expired session
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Missing or expired session"
+
+    NotFound:
+      description: Contact not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Contact not found"
+
+    ValidationError:
+      description: Invalid or missing request fields
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            invalid_contact_id:
+              value:
+                error: "Invalid contact ID"
+            invalid_contact_data:
+              value:
+                error: "Invalid contact data"
+            invalid_limit:
+              value:
+                error: "Invalid limit"
+            invalid_after:
+              value:
+                error: "Invalid after ID"
+
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Unexpected server error"
+
+  schemas:
+    ContactOutput:
+      type: object
+      required:
+        - contact_id
+        - first_name
+        - last_name
+        - phone_number
+        - company
+        - email
+      properties:
+        contact_id:
+          type: integer
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone_number:
+          type: string
+        company:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+      additionalProperties: false
+
+    ContactInput:
+      type: object
+      required:
+        - first_name
+        - last_name
+        - phone_number
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone_number:
+          type: string
+        company:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+      additionalProperties: false
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+      example:
+        error: "Unexpected server error"
+
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: PHPSESSID
