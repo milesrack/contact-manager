@@ -2,7 +2,6 @@
 
 namespace App;
 
-use App\ApiUtil\APIAuthUtil;
 use JsonException;
 
 class AuthController
