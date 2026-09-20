@@ -71,6 +71,30 @@ jobs:
           DB_PASSWORD: contact_manager_test
         run: composer migrate
 
+      - name: Start API server
+        env:
+          APP_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: contact_manager_test
+          DB_USER: contact_manager_test
+          DB_PASSWORD: contact_manager_test
+        run: |
+          php -S 127.0.0.1:8000 -t public public/api/index.php > /tmp/php-server.log 2>&1 &
+
+          # Wait briefly for the server to become reachable
+          for i in {1..10}; do
+            if curl --silent http://127.0.0.1:8000/ > /dev/null; then
+              exit 0
+            fi
+
+            sleep 1
+          done
+
+          echo "API server failed to start"
+          cat /tmp/php-server.log
+          exit 1
+
       - name: Check PHP
         run: composer check
 
