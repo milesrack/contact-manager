@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 require_once __DIR__ . "/../../vendor/autoload.php";
 
-use App\ApiUtil\APIAuthUtil;
+use App\APIAuthUtil;
 use App\AuthController;
-use App\UserRepository;
 use App\Database;
+use App\UserRepository;
 
 $pdo = Database::connect();
 $userRepository = new UserRepository($pdo);
@@ -19,11 +19,11 @@ $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 if ($path === '/api/register') {
     if ($method !== 'POST') {
-        \App\ApiUtil\APIAuthUtil::sendResponseCodeError(405, "Method not allowed");
+        App\APIAuthUtil::sendResponseCodeError(405, "Method not allowed");
         return;
     }
 
-    $contents = \App\ApiUtil\APIAuthUtil::grabAndValidateCredentials();
+    $contents = App\APIAuthUtil::grabAndValidateCredentials();
 
     if ($contents === null) {
         return;
@@ -34,11 +34,11 @@ if ($path === '/api/register') {
 
 } elseif ($path === '/api/login') {
     if ($method !== 'POST') {
-        \App\ApiUtil\APIAuthUtil::sendResponseCodeError(405, "Method not allowed");
+        App\APIAuthUtil::sendResponseCodeError(405, "Method not allowed");
         return;
     }
 
-    $contents = \App\ApiUtil\APIAuthUtil::grabAndValidateCredentials();
+    $contents = App\APIAuthUtil::grabAndValidateCredentials();
 
     if ($contents === null) {
         return;
@@ -48,7 +48,7 @@ if ($path === '/api/register') {
 
 } elseif ($path === '/api/logout') {
     if ($method !== 'POST') {
-        \App\ApiUtil\APIAuthUtil::sendResponseCodeError(405, "Method not allowed");
+        App\APIAuthUtil::sendResponseCodeError(405, "Method not allowed");
         return;
     }
 
