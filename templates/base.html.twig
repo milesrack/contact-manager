@@ -6,9 +6,11 @@
     <title>{% block title %}Contact Manager{% endblock %}</title>
     <link rel="stylesheet" href="/assets/css/app.css">
   </head>
-  <body>
+  <body class="bg-white text-zinc-950">
+    {% block header %}{% endblock %}
     <main class="mx-auto max-w-3xl p-6">
       {% block content %}{% endblock %}
     </main>
+    {% block scripts %}{% endblock %}
   </body>
 </html>
