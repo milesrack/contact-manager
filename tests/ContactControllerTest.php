@@ -9,6 +9,7 @@ use App\UserRepository;
 use App\Database;
 use PDO;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class ContactControllerTest extends TestCase
 {
@@ -203,229 +204,30 @@ final class ContactControllerTest extends TestCase
      * CREATE TESTS
      */
 
-    public function testCreateRejectsMissingFirstName(): void
+    /** @param array<string, mixed> $data */
+    #[DataProvider('invalidContactData')]
+    public function testCreateRejectsInvalidFields(array $data): void
     {
-        $result = $this->controller->create($this->userId, [
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsMissingLastName(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'phone_number' => '1234567890',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsMissingPhoneNumber(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsExtraFields(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'extra' => 'invalid',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsLongFields(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => str_repeat('A', 256),
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-        ]);
-        self::assertSame(422, $result['status']);
-        self::assertSame('Invalid contact data', $result['data']['error']);
-
-        $result = $this->controller->create($this->userId, [
-            'first_name' => "John",
-            'last_name' => str_repeat('A', 256),
-            'phone_number' => '1234567890',
-        ]);
-        self::assertSame(422, $result['status']);
-        self::assertSame('Invalid contact data', $result['data']['error']);
-
-        $result = $this->controller->create($this->userId, [
-            'first_name' => "John",
-            'last_name' => 'Smith',
-            'phone_number' => str_repeat('A', 21),
-        ]);
-        self::assertSame(422, $result['status']);
-        self::assertSame('Invalid contact data', $result['data']['error']);
-
-        $result = $this->controller->create($this->userId, [
-            'first_name' => "John",
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'company' => str_repeat('A', 256),
-        ]);
-        self::assertSame(422, $result['status']);
-        self::assertSame('Invalid contact data', $result['data']['error']);
-
-        $result = $this->controller->create($this->userId, [
-            'first_name' => "John",
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'email' => str_repeat('A', 256),
-        ]);
+        $result = $this->controller->create($this->userId, $data);
         self::assertSame(422, $result['status']);
         self::assertSame('Invalid contact data', $result['data']['error']);
     }
 
-    public function testCreateRejectsInvalidFirstNameType(): void
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function invalidContactData(): iterable
     {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 123,
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsInvalidLastNameType(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 123,
-            'phone_number' => '1234567890',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsInvalidPhoneNumberType(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => 1234567890,
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsInvalidCompanyType(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'company' => 123,
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsInvalidEmailType(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'email' => 123,
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsEmptyFirstName(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => '',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsEmptyLastName(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => '',
-            'phone_number' => '1234567890',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testCreateRejectsEmptyPhoneNumber(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
+        $valid = ['first_name' => 'John', 'last_name' => 'Smith', 'phone_number' => '1234567890'];
+        foreach (array_keys($valid) as $field) {
+            $missing = $valid;
+            unset($missing[$field]);
+            yield 'missing ' . $field => [$missing];
+            yield 'empty ' . $field => [array_replace($valid, [$field => ''])];
+        }
+        foreach (['first_name' => 255, 'last_name' => 255, 'phone_number' => 20, 'company' => 255, 'email' => 255] as $field => $limit) {
+            yield 'invalid type for ' . $field => [array_replace($valid, [$field => 123])];
+            yield 'too long ' . $field => [array_replace($valid, [$field => str_repeat('A', $limit + 1)])];
+        }
+        yield 'extra field' => [$valid + ['extra' => 'invalid']];
     }
 
     public function testCreateSucceedsWithRequiredFieldsOnly(): void
@@ -520,115 +322,18 @@ final class ContactControllerTest extends TestCase
         self::assertSame('Invalid contact ID', $result['data']['error']);
     }
 
-    public function testUpdateRejectsMissingRequiredFields(): void
-    {
-        $result = $this->controller->update($this->userId, 1, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testUpdateRejectsExtraFields(): void
-    {
-        $result = $this->controller->update($this->userId, 1, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'extra' => 'invalid',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testUpdateRejectsLongFields(): void
+    /** @param array<string, mixed> $data */
+    #[DataProvider('invalidContactData')]
+    public function testUpdateRejectsInvalidFields(array $data): void
     {
         $contactId = $this->controller->create($this->userId, [
-            'first_name' => "John",
+            'first_name' => 'John',
             'last_name' => 'Smith',
             'phone_number' => '1234567890',
         ])['data']['contact_id'];
-
-        $result = $this->controller->update($this->userId, $contactId, [
-            'first_name' => str_repeat('A', 256),
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-        ]);
+        $result = $this->controller->update($this->userId, $contactId, $data);
         self::assertSame(422, $result['status']);
         self::assertSame('Invalid contact data', $result['data']['error']);
-
-        $result = $this->controller->update($this->userId, $contactId, [
-            'first_name' => "John",
-            'last_name' => str_repeat('A', 256),
-            'phone_number' => '1234567890',
-        ]);
-        self::assertSame(422, $result['status']);
-        self::assertSame('Invalid contact data', $result['data']['error']);
-
-        $result = $this->controller->update($this->userId, $contactId, [
-            'first_name' => "John",
-            'last_name' => 'Smith',
-            'phone_number' => str_repeat('A', 21),
-        ]);
-        self::assertSame(422, $result['status']);
-        self::assertSame('Invalid contact data', $result['data']['error']);
-
-        $result = $this->controller->update($this->userId, $contactId, [
-            'first_name' => "John",
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'company' => str_repeat('A', 256),
-        ]);
-        self::assertSame(422, $result['status']);
-        self::assertSame('Invalid contact data', $result['data']['error']);
-
-        $result = $this->controller->update($this->userId, $contactId, [
-            'first_name' => "John",
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'email' => str_repeat('A', 256),
-        ]);
-        self::assertSame(422, $result['status']);
-        self::assertSame('Invalid contact data', $result['data']['error']);
-    }
-
-    public function testUpdateRejectsInvalidFieldType(): void
-    {
-        $result = $this->controller->update($this->userId, 1, [
-            'first_name' => 123,
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
-    }
-
-    public function testUpdateRejectsEmptyRequiredField(): void
-    {
-        $result = $this->controller->update($this->userId, 1, [
-            'first_name' => '',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-        ]);
-
-        self::assertSame(422, $result['status']);
-        self::assertSame(
-            'Invalid contact data',
-            $result['data']['error'],
-        );
     }
 
     public function testUpdateSucceeds(): void
