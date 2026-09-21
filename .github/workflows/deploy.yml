@@ -33,6 +33,18 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
       - name: Configure SSH
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -107,4 +119,4 @@ jobs:
       - name: Verify deployment
         env:
           DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
-        run: curl --fail --silent --show-error "https://$DEPLOY_DOMAIN/" >/dev/null
+        run: curl --fail --location --silent --show-error "https://$DEPLOY_DOMAIN/" >/dev/null
