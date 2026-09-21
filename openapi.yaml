@@ -1,0 +1,480 @@
+openapi: 3.0.3
+
+info:
+  title: Contact Manager API
+  version: 1.0.0
+  description: API for managing user contacts.
+
+paths:
+  /api/auth/register:
+    post:
+      summary: Create an account without logging in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+            example:
+              email: "ada@example.com"
+              password: "example-password"
+      responses:
+        "201":
+          $ref: "#/components/responses/AuthUserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/AuthValidationError"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/auth/login:
+    post:
+      summary: Log in and regenerate the session ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+            example:
+              email: "ada@example.com"
+              password: "example-password"
+      responses:
+        "200":
+          $ref: "#/components/responses/AuthUserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/AuthValidationError"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Invalid Credentials"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/auth/logout:
+    post:
+      summary: Destroy the session and expire its cookie
+      responses:
+        "200":
+          $ref: "#/components/responses/AuthLogoutResponse"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/contacts:
+    get:
+      summary: Search contacts
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: after_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          $ref: "#/components/responses/ContactSearchResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "400":
+          $ref: "#/components/responses/BadRequestUri"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      summary: Create a contact
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "201":
+          $ref: "#/components/responses/ContactCreateResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/contacts/{contact_id}:
+    patch:
+      summary: Update a contact
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/ContactSuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      summary: Delete a contact
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: contact_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          $ref: "#/components/responses/ContactSuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "400":
+          $ref: "#/components/responses/BadRequestUri"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  responses:
+    AuthUserResponse:
+      description: Account created or login successful. Only login authenticates the session.
+      headers:
+        Set-Cookie:
+          description: PHPSESSID session cookie; login replaces the previous session ID.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [user_id]
+            properties:
+              user_id:
+                type: integer
+          example:
+            user_id: 123
+
+    AuthLogoutResponse:
+      description: Session destroyed. Also succeeds when already logged out.
+      headers:
+        Set-Cookie:
+          description: Expires the PHPSESSID cookie.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [success]
+            properties:
+              success:
+                type: boolean
+          example:
+            success: true
+
+    AuthValidationError:
+      description: Missing or invalid credentials, or email already registered.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            invalid_password:
+              value:
+                error: "Please enter a valid password."
+            duplicate_email:
+              value:
+                error: "Email address is already registered."
+
+    MethodNotAllowed:
+      description: Unsupported HTTP method
+      headers:
+        Allow:
+          schema:
+            type: string
+          example: POST
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Unsupported HTTP method"
+
+    ContactSearchResponse:
+      description: Successful contact search
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - contacts
+            properties:
+              contacts:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContactOutput"
+          example:
+            contacts:
+              - contact_id: 123
+                first_name: "John"
+                last_name: "Smith"
+                company: "Example Inc."
+                email: "john.smith@example.com"
+                phone_number: "555-123-4567"
+
+    ContactCreateResponse:
+      description: Contact created successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - contact_id
+            properties:
+              contact_id:
+                type: integer
+          example:
+            contact_id: 123
+
+    ContactSuccessResponse:
+      description: Contact operation completed successfully
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - success
+            properties:
+              success:
+                type: boolean
+          example:
+            success: true
+
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            malformed_json:
+              value:
+                error: "Malformed JSON"
+            invalid_request_body:
+              value:
+                error: "Unable to read request body"
+            invalid_request_uri:
+              value:
+                error: "Invalid request URI"
+
+    BadRequestUri:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Invalid request URI"
+
+    Unauthorized:
+      description: Missing or expired session
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Missing or expired session"
+
+    NotFound:
+      description: Contact not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Contact not found"
+
+    ValidationError:
+      description: Invalid or missing request fields
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            invalid_contact_id:
+              value:
+                error: "Invalid contact ID"
+            invalid_contact_data:
+              value:
+                error: "Invalid contact data"
+            invalid_limit:
+              value:
+                error: "Invalid limit"
+            invalid_after:
+              value:
+                error: "Invalid after ID"
+
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Unexpected server error"
+
+  schemas:
+    Credentials:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          description: Registration requires a valid email address of at most 255 bytes.
+          example: "ada@example.com"
+        password:
+          type: string
+          minLength: 1
+          maxLength: 72
+          description: Must contain a non-whitespace character, contain no NUL bytes, and be at most 72 bytes for bcrypt. Passwords are not trimmed.
+
+    ContactOutput:
+      type: object
+      required:
+        - contact_id
+        - first_name
+        - last_name
+        - phone_number
+        - company
+        - email
+      properties:
+        contact_id:
+          type: integer
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone_number:
+          type: string
+        company:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+      additionalProperties: false
+
+    ContactInput:
+      type: object
+      description: Fields are trimmed. Required fields must not be blank; blank optional fields become null. Length limits are enforced in bytes. PATCH requires all required fields.
+      required:
+        - first_name
+        - last_name
+        - phone_number
+      properties:
+        first_name:
+          type: string
+          maxLength: 255
+          minLength: 1
+        last_name:
+          type: string
+          maxLength: 255
+          minLength: 1
+        phone_number:
+          type: string
+          maxLength: 20
+          minLength: 1
+        company:
+          type: string
+          maxLength: 255
+          nullable: true
+        email:
+          type: string
+          maxLength: 255
+          nullable: true
+      example:
+        first_name: "Ada"
+        last_name: "Lovelace"
+        phone_number: "555-123-4567"
+        company: null
+        email: "ada@example.com"
+      additionalProperties: false
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+      example:
+        error: "Unexpected server error"
+
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: PHPSESSID
