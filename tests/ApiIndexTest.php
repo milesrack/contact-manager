@@ -94,6 +94,70 @@ final class ApiIndexTest extends TestCase
         }
     }
 
+    public function testUnauthenticatedFrontendRoutes(): void
+    {
+        $client = new Client(['base_uri' => self::$baseUrl, 'http_errors' => false, 'allow_redirects' => false]);
+        $response = $client->get('/');
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame('/login', $response->getHeaderLine('Location'));
+
+        foreach (['/login' => 'Log in', '/register' => 'Register'] as $path => $title) {
+            $response = $client->get($path . '?next=test');
+            self::assertSame(200, $response->getStatusCode());
+            self::assertStringStartsWith('text/html', $response->getHeaderLine('Content-Type'));
+            self::assertStringContainsString($title, (string) $response->getBody());
+            self::assertStringContainsString('/assets/css/app.css', (string) $response->getBody());
+        }
+    }
+
+    public function testAuthenticatedFrontendRoutes(): void
+    {
+        $response = $this->client->get('/');
+        self::assertSame(200, $response->getStatusCode());
+        self::assertMatchesRegularExpression('/<h1[^>]*>Contact Manager<\/h1>/', (string) $response->getBody());
+
+        foreach (['/login', '/register'] as $path) {
+            $response = $this->client->get($path);
+            self::assertSame(302, $response->getStatusCode());
+            self::assertSame('/', $response->getHeaderLine('Location'));
+        }
+    }
+
+    public function testInvalidSessionUserIdsDoNotAuthenticateFrontend(): void
+    {
+        foreach ([0, -1, '1', true, 1.5, null, []] as $userId) {
+            $this->client->get('/__test__/session', ['query' => [
+                'session_id' => 'frontend-test-' . bin2hex(random_bytes(16)),
+                'user_id_json' => json_encode($userId, JSON_THROW_ON_ERROR),
+            ]]);
+            $response = $this->client->get('/');
+            self::assertSame(302, $response->getStatusCode());
+            self::assertSame('/login', $response->getHeaderLine('Location'));
+            self::assertSame(200, $this->client->get('/login')->getStatusCode());
+        }
+    }
+
+    public function testUnknownFrontendRoutesReturnHtml404(): void
+    {
+        foreach (['/missing', '/dashboard', '/contacts', '/apiary'] as $path) {
+            $response = $this->client->get($path);
+            self::assertSame(404, $response->getStatusCode());
+            self::assertStringStartsWith('text/html', $response->getHeaderLine('Content-Type'));
+            self::assertStringContainsString('Page not found', (string) $response->getBody());
+        }
+    }
+
+    public function testUnsupportedFrontendMethodsReturn405(): void
+    {
+        foreach (['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'] as $method) {
+            foreach (['/', '/login', '/register'] as $path) {
+                $response = $this->client->request($method, $path);
+                self::assertSame(405, $response->getStatusCode());
+                self::assertSame('GET', $response->getHeaderLine('Allow'));
+            }
+        }
+    }
+
     public function testGetContactsWithoutSessionReturnsUnauthorized(): void
     {
         $client = new Client([
@@ -507,9 +571,10 @@ final class ApiIndexTest extends TestCase
         $projectRoot = self::$sessionDir . '/app';
         mkdir($projectRoot . '/public/api', 0700, true);
         mkdir($projectRoot . '/config', 0700, true);
-        foreach (['public/api/index.php', 'public/index.php', 'config/bootstrap.php', 'config/app.php'] as $file) {
+        foreach (['public/api/index.php', 'public/index.php', 'config/bootstrap.php', 'config/app.php', 'config/twig.php'] as $file) {
             copy(dirname(__DIR__) . '/' . $file, $projectRoot . '/' . $file);
         }
+        symlink(dirname(__DIR__) . '/templates', $projectRoot . '/templates');
         symlink(dirname(__DIR__) . '/vendor', $projectRoot . '/vendor');
         $serverEnv = getenv();
         $dotenv = '';
@@ -538,7 +603,9 @@ if ($path === '/__test__/session') {
     session_save_path(%s);
     session_id($sessionId);
     session_start();
-    $_SESSION['user_id'] = (int) ($_GET['user_id'] ?? 0);
+    $_SESSION['user_id'] = isset($_GET['user_id_json'])
+        ? json_decode($_GET['user_id_json'], true, flags: JSON_THROW_ON_ERROR)
+        : (int) ($_GET['user_id'] ?? 0);
     session_write_close();
     header('Set-Cookie: PHPSESSID=' . $sessionId . '; path=/; HttpOnly');
     header('Content-Type: application/json');
@@ -546,25 +613,23 @@ if ($path === '/__test__/session') {
     return;
 }
 
-if ($path === '/' || $path === '/index.php') {
-    require $projectRoot . '/public/index.php';
-    return;
+if (is_file($projectRoot . '/public' . $path)) {
+    return false;
 }
 
-if (str_starts_with($path, '/api')) {
+if ($path === '/api' || str_starts_with($path, '/api/')) {
     require $projectRoot . '/public/api/index.php';
     return;
 }
 
-header('HTTP/1.1 404 Not Found');
-echo json_encode(['error' => 'Not found']);
+require $projectRoot . '/public/index.php';
 PHP;
 
         $routerCode = sprintf($routerCode, var_export($projectRoot, true), var_export(self::$sessionDir, true));
         file_put_contents(self::$routerPath, $routerCode);
 
         $process = proc_open(
-            ['php', '-d', 'session.save_path=' . self::$sessionDir, '-S', '127.0.0.1:' . $port, self::$routerPath],
+            ['php', '-d', 'session.save_path=' . self::$sessionDir, '-S', '127.0.0.1:' . $port, '-t', $projectRoot . '/public', self::$routerPath],
             [
                 1 => ['file', self::$serverStdout, 'w'],
                 2 => ['file', self::$serverStderr, 'w'],
@@ -611,6 +676,7 @@ PHP;
             'http_errors' => false,
             'timeout' => 10,
             'cookies' => new CookieJar(),
+            'allow_redirects' => false,
         ]);
 
         $response = $client->request('GET', '/__test__/session', [

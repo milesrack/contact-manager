@@ -14,17 +14,43 @@ if ($app['env'] === 'production') {
 } else {
     ini_set('display_errors', '1');
 }
-?>
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Contact Manager</title>
-</head>
-<body>
-    <main>
-        <h1>Contact Manager</h1>
-    </main>
-</body>
-</html>
+
+/** @var Twig\Environment $twig */
+$twig = require dirname(__DIR__) . '/config/twig.php';
+
+if (!session_start()) {
+    throw new RuntimeException('Unable to start session');
+}
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN';
+$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$userId = $_SESSION['user_id'] ?? null;
+$authenticated = is_int($userId) && $userId > 0;
+
+if ($method !== 'GET') {
+    http_response_code(405);
+    header('Allow: GET');
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'Method not allowed';
+    exit;
+}
+
+if ($path === '/') {
+    if (!$authenticated) {
+        header('Location: /login', true, 302);
+        exit;
+    }
+    $template = 'contacts/index.html.twig';
+} elseif ($path === '/login' || $path === '/register') {
+    if ($authenticated) {
+        header('Location: /', true, 302);
+        exit;
+    }
+    $template = $path === '/login' ? 'auth/login.html.twig' : 'auth/register.html.twig';
+} else {
+    http_response_code(404);
+    $template = 'errors/404.html.twig';
+}
+
+header('Content-Type: text/html; charset=utf-8');
+echo $twig->render($template);
