@@ -134,12 +134,31 @@ final class ContactRepository
                     OR phone_number LIKE :phone_query
                 )
         ';
-
         if ($afterId !== null) {
-            $sql .= ' AND contact_id > :after_id';
+            $sql .= '
+                AND (
+                    last_name > (
+                        SELECT last_name
+                        FROM contacts
+                        WHERE contact_id = :after_id_1
+                            AND user_id = :user_id_1
+                    )
+                    OR (
+                        last_name = (
+                            SELECT last_name
+                            FROM contacts
+                            WHERE contact_id = :after_id_2
+                                AND user_id = :user_id_2
+                        )
+                        AND contact_id > :after_id_3
+                    )
+                )
+            ';
         }
-
-        $sql .= ' ORDER BY contact_id ASC LIMIT :limit';
+        $sql .= '
+            ORDER BY last_name ASC, contact_id ASC
+            LIMIT :limit
+        ';
 
         $statement = $this->pdo->prepare($sql);
 
@@ -152,7 +171,11 @@ final class ContactRepository
         $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
 
         if ($afterId !== null) {
-            $statement->bindValue(':after_id', $afterId, PDO::PARAM_INT);
+            $statement->bindValue(':after_id_1', $afterId, PDO::PARAM_INT);
+            $statement->bindValue(':after_id_2', $afterId, PDO::PARAM_INT);
+            $statement->bindValue(':after_id_3', $afterId, PDO::PARAM_INT);
+            $statement->bindValue(':user_id_1', $userId, PDO::PARAM_INT);
+            $statement->bindValue(':user_id_2', $userId, PDO::PARAM_INT);
         }
 
         $statement->execute();

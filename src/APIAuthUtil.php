@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App;
 
 class APIAuthUtil
@@ -39,7 +41,7 @@ class APIAuthUtil
             APIAuthUtil::sendResponseCodeError(422, "Please enter a valid email address.");
             return null;
         }
-        if (!is_string($pass)) {
+        if (!is_string($pass) || trim($pass) === "" || strlen($pass) > 72 || str_contains($pass, "\0")) {
             APIAuthUtil::sendResponseCodeError(422, "Please enter a valid password.");
             return null;
         }
