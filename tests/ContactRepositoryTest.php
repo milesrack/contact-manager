@@ -171,8 +171,8 @@ final class ContactRepositoryTest extends TestCase
         $results = $this->contacts->search($userId, 'Jo');
 
         self::assertCount(2, $results);
-        self::assertSame('John', $results[0]['first_name']);
-        self::assertSame('Jones', $results[1]['last_name']);
+        self::assertSame('Jones', $results[0]['last_name']);
+        self::assertSame('John', $results[1]['first_name']);
     }
 
     public function testEmptySearchReturnUsersContacts(): void
