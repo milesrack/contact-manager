@@ -10,7 +10,7 @@ export default defineConfig([
     files: ["public/**/*.js"],
     languageOptions: {
       ecmaVersion: "latest",
-      sourceType: "script",
+      sourceType: "module",
       globals: globals.browser,
     },
     rules: js.configs.recommended.rules,

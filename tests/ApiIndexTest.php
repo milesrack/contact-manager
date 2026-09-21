@@ -101,11 +101,22 @@ final class ApiIndexTest extends TestCase
         self::assertSame(302, $response->getStatusCode());
         self::assertSame('/login', $response->getHeaderLine('Location'));
 
-        foreach (['/login' => 'Log in', '/register' => 'Register'] as $path => $title) {
+        foreach (['/login' => 'current-password', '/register' => 'new-password'] as $path => $autocomplete) {
             $response = $client->get($path . '?next=test');
             self::assertSame(200, $response->getStatusCode());
             self::assertStringStartsWith('text/html', $response->getHeaderLine('Content-Type'));
-            self::assertStringContainsString($title, (string) $response->getBody());
+            $document = new \DOMDocument();
+            $document->loadHTML((string) $response->getBody(), LIBXML_NOERROR | LIBXML_NOWARNING);
+            $xpath = new \DOMXPath($document);
+            self::assertSame('/api/auth' . $path, $xpath->evaluate('string(//form/@action)'));
+            self::assertSame('post', $xpath->evaluate('string(//form/@method)'));
+            self::assertSame('email', $xpath->evaluate('string(//input[@name="email"]/@type)'));
+            self::assertSame('email', $xpath->evaluate('string(//input[@name="email"]/@autocomplete)'));
+            self::assertSame('password', $xpath->evaluate('string(//input[@name="password"]/@type)'));
+            self::assertSame($autocomplete, $xpath->evaluate('string(//input[@name="password"]/@autocomplete)'));
+            self::assertSame(2.0, $xpath->evaluate('count(//input[@required])'));
+            self::assertSame(2.0, $xpath->evaluate('count(//label[@for = //input/@id][normalize-space()])'));
+            self::assertSame(1.0, $xpath->evaluate('count(//form//*[@role="alert"])'));
             self::assertStringContainsString('/assets/css/app.css', (string) $response->getBody());
         }
     }
