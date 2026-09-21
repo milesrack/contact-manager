@@ -80,6 +80,16 @@ Each pull request must:
 
 All pull requests must use rebase merging to preserve commit history.
 
+## Frontend Tooling
+
+Use Node.js 24 and run `npm ci` to install the tooling.
+
+- `npm run build`: compile minified CSS.
+- `npm run dev`: rebuild CSS automatically while editing.
+
+Edit Twig templates in `templates/` and styles in `assets/css/app.css`.
+The generated `public/assets/css/app.css` is ignored by Git and rebuilt during deployment.
+
 ## Checks
 
 Before opening a pull request:
@@ -88,6 +98,8 @@ Before opening a pull request:
 composer check
 npm run check
 ```
+
+`npm run check` runs frontend linting, formatting checks and the CSS build.
 
 To format files:
 

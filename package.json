@@ -8,12 +8,16 @@
     "lint": "eslint public --no-error-on-unmatched-pattern",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "check": "npm run lint && npm run format:check"
+    "check": "npm run lint && npm run format:check && npm run build",
+    "build": "tailwindcss -i ./assets/css/app.css -o ./public/assets/css/app.css --minify",
+    "dev": "tailwindcss -i ./assets/css/app.css -o ./public/assets/css/app.css --watch"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
+    "@tailwindcss/cli": "^4.3.3",
     "eslint": "^10.10.0",
     "globals": "^17.12.0",
-    "prettier": "^3.0.0"
+    "prettier": "^3.0.0",
+    "tailwindcss": "^4.3.3"
   }
 }
