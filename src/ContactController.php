@@ -136,7 +136,7 @@ final class ContactController
     }
 
     /**
-     * Validate contact data and return error array, or null
+     * Return normalised contact data, or null when invalid
      *
      * @param array<string, mixed> $data
      *
@@ -159,16 +159,9 @@ final class ContactController
             return null;
         }
 
-        // Ensure empty values are null
+        // Supply defaults for optional fields
         $data['company'] = $data['company'] ?? null;
         $data['email'] = $data['email'] ?? null;
-        if ($data['company'] === '') {
-            $data['company'] = null;
-        }
-        if ($data['email'] === '') {
-            $data['email'] = null;
-        }
-
         // Reject if unnecessary fields were passed
         if (count($data) !== 5) {
             return null;
@@ -188,8 +181,12 @@ final class ContactController
         $data['first_name'] = trim($data['first_name']);
         $data['last_name'] = trim($data['last_name']);
         $data['phone_number'] = trim($data['phone_number']);
-        $data['company'] = $data['company'] === null ? null : (trim($data['company']) === '' ? null : trim($data['company']));
-        $data['email'] = $data['email'] === null ? null : (trim($data['email']) === '' ? null : trim($data['email']));
+        foreach (['company', 'email'] as $field) {
+            if ($data[$field] !== null) {
+                $value = trim($data[$field]);
+                $data[$field] = $value === '' ? null : $value;
+            }
+        }
 
         // Check that required fields are not empty strings
         if (
