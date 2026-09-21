@@ -185,6 +185,12 @@ final class ContactController
             return null;
         }
 
+        $data['first_name'] = trim($data['first_name']);
+        $data['last_name'] = trim($data['last_name']);
+        $data['phone_number'] = trim($data['phone_number']);
+        $data['company'] = $data['company'] === null ? null : (trim($data['company']) === '' ? null : trim($data['company']));
+        $data['email'] = $data['email'] === null ? null : (trim($data['email']) === '' ? null : trim($data['email']));
+
         // Check that required fields are not empty strings
         if (
             $data['first_name'] === ''

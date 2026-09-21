@@ -2,98 +2,98 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../vendor/autoload.php';
-
 use App\ContactController;
 use App\Database;
 
+ini_set('display_errors', '0');
 header('Content-Type: application/json');
 
 /**
- * Respond and exit
- *
- * @param array{
- *     status: int,
- *     data: mixed
- * } $result
+ * @param array{status: int, data: mixed} $result
  */
 function respond(array $result): never
 {
+    $json = json_encode($result['data'], JSON_THROW_ON_ERROR);
     http_response_code($result['status']);
-    echo json_encode($result['data']);
+    echo $json;
     exit;
 }
 
 /**
- * Get the decoded json data from php://input
- *
  * @return array<string, mixed>
  */
 function getJsonData(): array
 {
     $body = file_get_contents('php://input');
     if ($body === false) {
-        respond(['status' => 400, 'data' => ['error' => 'Unable to read request body']]);
+        throw new RuntimeException('Unable to read request body');
     }
-
-    $data = json_decode($body, true);
-    if (!is_array($data)) {
+    try {
+        $data = json_decode($body, true, flags: JSON_THROW_ON_ERROR);
+    } catch (JsonException $e) {
         respond(['status' => 400, 'data' => ['error' => 'Malformed JSON']]);
     }
-
+    if (!is_array($data)) {
+        respond(['status' => 422, 'data' => ['error' => 'Expected a JSON object']]);
+    }
     return $data;
 }
 
-// Start and validate session
-session_start();
-$userId = $_SESSION['user_id'] ?? null;
-if (!is_int($userId)) {
-    respond(['status' => 401, 'data' => ['error' => 'Missing or expired session']]);
-}
+try {
+    require_once __DIR__ . '/../../config/bootstrap.php';
 
-// Setup database and controllers
-$pdo = Database::connect();
-$controller = new ContactController($pdo);
-
-// Get method and path
-$method = $_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN';
-$requestUri = $_SERVER['REQUEST_URI'] ?? null;
-if (!is_string($requestUri)) {
-    respond(['status' => 400, 'data' => ['error' => 'Invalid request URI']]);
-}
-$path = parse_url($requestUri, PHP_URL_PATH);
-if (!is_string($path)) {
-    respond(['status' => 400, 'data' => ['error' => 'Invalid request URI']]);
-}
-
-if ($path === '/api/contacts') {
-    if ($method === 'GET') {
-        $query = (string) ($_GET['query'] ?? '');
-        $limit = (int) ($_GET['limit'] ?? 50);
-        $afterId = isset($_GET['after_id']) ? (int) $_GET['after_id'] : null;
-
-        respond($controller->search($userId, $query, $limit, $afterId));
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN';
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+    if (!session_start()) {
+        throw new RuntimeException('Unable to start session');
     }
 
-    if ($method === 'POST') {
-        respond($controller->create($userId, getJsonData()));
-    }
+    if ($path === '/api/contacts') {
+        if ($method !== 'GET' && $method !== 'POST') {
+            header('Allow: GET, POST');
+            respond(['status' => 405, 'data' => ['error' => 'Unsupported HTTP method']]);
+        }
+        $userId = $_SESSION['user_id'] ?? null;
+        if (!is_int($userId) || $userId < 1) {
+            respond(['status' => 401, 'data' => ['error' => 'Missing or expired session']]);
+        }
+        $controller = new ContactController(Database::connect());
 
-    respond(['status' => 405, 'data' => ['error' => 'Unsupported HTTP method']]);
+        if ($method === 'GET') {
+            $query = $_GET['query'] ?? '';
+            $limit = filter_var($_GET['limit'] ?? '50', FILTER_VALIDATE_INT);
+            $afterId = isset($_GET['after_id']) ? filter_var($_GET['after_id'], FILTER_VALIDATE_INT) : null;
+            if (!is_string($query) || $limit === false || $afterId === false) {
+                respond(['status' => 422, 'data' => ['error' => 'Invalid search parameters']]);
+            }
+            respond($controller->search($userId, $query, $limit, $afterId));
+        } elseif ($method === 'POST') {
+            respond($controller->create($userId, getJsonData()));
+        }
+    } elseif (is_string($path) && preg_match('#^/api/contacts/(\d+)$#', $path, $matches) === 1) {
+        if ($method !== 'PATCH' && $method !== 'DELETE') {
+            header('Allow: PATCH, DELETE');
+            respond(['status' => 405, 'data' => ['error' => 'Unsupported HTTP method']]);
+        }
+        $userId = $_SESSION['user_id'] ?? null;
+        if (!is_int($userId) || $userId < 1) {
+            respond(['status' => 401, 'data' => ['error' => 'Missing or expired session']]);
+        }
+        $controller = new ContactController(Database::connect());
+
+        $contactId = filter_var($matches[1], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($contactId === false) {
+            respond(['status' => 422, 'data' => ['error' => 'Invalid contact ID']]);
+        }
+        if ($method === 'PATCH') {
+            respond($controller->update($userId, $contactId, getJsonData()));
+        } elseif ($method === 'DELETE') {
+            respond($controller->delete($userId, $contactId));
+        }
+    } else {
+        respond(['status' => 404, 'data' => ['error' => 'Not found']]);
+    }
+} catch (Throwable $e) {
+    error_log((string) $e);
+    respond(['status' => 500, 'data' => ['error' => 'Unexpected server error']]);
 }
-
-if (preg_match('#^/api/contacts/(\d+)$#', $path, $matches) === 1) {
-    $contactId = (int) $matches[1];
-
-    if ($method === 'PATCH') {
-        respond($controller->update($userId, $contactId, getJsonData()));
-    }
-
-    if ($method === 'DELETE') {
-        respond($controller->delete($userId, $contactId));
-    }
-
-    respond(['status' => 405, 'data' => ['error' => 'Unsupported HTTP method']]);
-}
-
-respond(['status' => 404, 'data' => ['error' => 'Not found']]);

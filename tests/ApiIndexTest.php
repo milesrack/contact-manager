@@ -58,7 +58,7 @@ final class ApiIndexTest extends TestCase
             );
 
             foreach ($files as $file) {
-                if ($file->isDir()) {
+                if ($file->isDir() && !$file->isLink()) {
                     rmdir($file->getPathname());
                 } else {
                     unlink($file->getPathname());
@@ -334,6 +334,43 @@ final class ApiIndexTest extends TestCase
         self::assertSame(['error' => 'Not found'], $this->decodeJson($response));
     }
 
+    public function testDatabaseFailureReturnsJson(): void
+    {
+        $envPath = self::$sessionDir . '/app/.env';
+        $dotenv = file_get_contents($envPath);
+        self::assertIsString($dotenv);
+        try {
+            file_put_contents($envPath, $dotenv . "\nDB_PORT=0\n");
+            $response = $this->client->get('/api/contacts');
+            self::assertSame(500, $response->getStatusCode());
+            self::assertSame(['error' => 'Unexpected server error'], $this->decodeJson($response));
+        } finally {
+            file_put_contents($envPath, $dotenv);
+        }
+    }
+
+    public function testSearchRejectsMalformedParameters(): void
+    {
+        foreach (['query[]=smith', 'limit=1junk', 'limit[]=1', 'limit=1.5', 'after_id=2junk', 'after_id[]=2'] as $query) {
+            $response = $this->client->get('/api/contacts?' . $query);
+            self::assertSame(422, $response->getStatusCode(), $query);
+            self::assertArrayHasKey('error', $this->decodeJson($response));
+        }
+    }
+
+    public function testContactWritesRejectWhitespaceRequiredFields(): void
+    {
+        $data = ['first_name' => 'Ada', 'last_name' => 'Lovelace', 'phone_number' => '123'];
+        $response = $this->client->post('/api/contacts', ['json' => $data]);
+        $contactId = $this->decodeJson($response)['contact_id'];
+        foreach (array_keys($data) as $field) {
+            $invalid = array_replace($data, [$field => '   ']);
+            self::assertSame(422, $this->client->post('/api/contacts', ['json' => $invalid])->getStatusCode());
+            self::assertSame(422, $this->client->patch('/api/contacts/' . $contactId, ['json' => $invalid])->getStatusCode());
+        }
+        self::assertSame('Ada', $this->decodeJson($this->client->get('/api/contacts'))['contacts'][0]['first_name']);
+    }
+
     private static function findAvailablePort(): int
     {
         $server = @stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
@@ -358,7 +395,21 @@ final class ApiIndexTest extends TestCase
         self::$routerPath = sys_get_temp_dir() . '/contact-manager-router-' . bin2hex(random_bytes(8)) . '.php';
         self::$serverStdout = sys_get_temp_dir() . '/contact-manager-server-' . bin2hex(random_bytes(8)) . '.stdout.log';
         self::$serverStderr = sys_get_temp_dir() . '/contact-manager-server-' . bin2hex(random_bytes(8)) . '.stderr.log';
-        $projectRoot = dirname(__DIR__);
+        // Exercise the API with .env configuration, as deployed, without inherited DB variables.
+        $projectRoot = self::$sessionDir . '/app';
+        mkdir($projectRoot . '/public/api', 0700, true);
+        mkdir($projectRoot . '/config', 0700, true);
+        foreach (['public/api/index.php', 'public/index.php', 'config/bootstrap.php', 'config/app.php'] as $file) {
+            copy(dirname(__DIR__) . '/' . $file, $projectRoot . '/' . $file);
+        }
+        symlink(dirname(__DIR__) . '/vendor', $projectRoot . '/vendor');
+        $serverEnv = getenv();
+        $dotenv = '';
+        foreach (['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'APP_ENV', 'APP_URL'] as $key) {
+            $dotenv .= $key . '=' . getenv($key) . "\n";
+            unset($serverEnv[$key]);
+        }
+        file_put_contents($projectRoot . '/.env', $dotenv);
 
         $routerCode = <<<'PHP'
 <?php
@@ -412,7 +463,7 @@ PHP;
             ],
             $pipes,
             null,
-            null,
+            $serverEnv,
             ['bypass_shell' => true],
         );
 
@@ -500,7 +551,8 @@ PHP;
      */
     private function decodeJson(ResponseInterface $response): array
     {
-        $payload = json_decode((string) $response->getBody(), true);
+        self::assertStringStartsWith('application/json', $response->getHeaderLine('Content-Type'));
+        $payload = json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR);
 
         self::assertIsArray($payload);
 
