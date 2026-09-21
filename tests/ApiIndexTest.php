@@ -99,7 +99,6 @@ final class ApiIndexTest extends TestCase
         $client = new Client([
             'base_uri' => self::$baseUrl,
             'http_errors' => false,
-            'verify' => false,
             'timeout' => 10,
         ]);
 
@@ -581,7 +580,6 @@ PHP;
         $client = new Client([
             'base_uri' => self::$baseUrl,
             'http_errors' => false,
-            'verify' => false,
             'timeout' => 2,
         ]);
 
@@ -611,7 +609,6 @@ PHP;
         $client = new Client([
             'base_uri' => self::$baseUrl,
             'http_errors' => false,
-            'verify' => false,
             'timeout' => 10,
             'cookies' => new CookieJar(),
         ]);
@@ -622,7 +619,6 @@ PHP;
                 'session_id' => 'api-test-' . bin2hex(random_bytes(16)),
             ],
             'http_errors' => false,
-            'verify' => false,
         ]);
 
         self::assertSame(200, $response->getStatusCode());
