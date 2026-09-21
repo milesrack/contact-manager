@@ -333,6 +333,106 @@ final class ApiIndexTest extends TestCase
         self::assertSame(['error' => 'Not found'], $this->decodeJson($response));
     }
 
+    public function testAuthenticationAndContactLifecycle(): void
+    {
+        $cookies = new CookieJar();
+        $client = new Client(['base_uri' => self::$baseUrl, 'http_errors' => false, 'cookies' => $cookies]);
+        $email = bin2hex(random_bytes(16)) . '@example.com';
+        $credentials = ['email' => $email, 'password' => 'test-password'];
+        $response = $client->post('/api/auth/register', ['json' => $credentials]);
+        self::assertSame(201, $response->getStatusCode());
+        $userId = $this->decodeJson($response)['user_id'];
+        self::assertIsInt($userId);
+        $this->extraUserIds[] = $userId;
+        $account = $this->users->findByEmail($email);
+        self::assertNotNull($account);
+        self::assertTrue(password_verify($credentials['password'], $account['password_hash']));
+        self::assertSame(401, $client->get('/api/contacts')->getStatusCode());
+        $oldSession = $this->sessionId($cookies);
+        self::assertNotSame('', $oldSession);
+
+        $response = $client->post('/api/auth/login', ['json' => $credentials]);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(['user_id' => $userId], $this->decodeJson($response));
+        $loginSession = $this->sessionId($cookies);
+        self::assertNotSame('', $loginSession);
+        self::assertNotSame($oldSession, $loginSession);
+        $oldClient = new Client(['base_uri' => self::$baseUrl, 'http_errors' => false]);
+        self::assertSame(401, $oldClient->get('/api/contacts', ['headers' => ['Cookie' => 'PHPSESSID=' . $oldSession]])->getStatusCode());
+
+        $data = ['first_name' => ' Ada ', 'last_name' => ' Lovelace ', 'phone_number' => ' 123 ', 'company' => '   ', 'email' => '   '];
+        $response = $client->post('/api/contacts', ['json' => $data]);
+        self::assertSame(201, $response->getStatusCode());
+        $contactId = $this->decodeJson($response)['contact_id'];
+        $response = $client->get('/api/contacts?query=love');
+        self::assertSame(200, $response->getStatusCode());
+        $contacts = $this->decodeJson($response)['contacts'];
+        self::assertCount(1, $contacts);
+        self::assertSame('Ada', $contacts[0]['first_name']);
+        self::assertNull($contacts[0]['company']);
+        self::assertNull($contacts[0]['email']);
+        $url = '/api/contacts/' . $contactId;
+
+        self::assertSame([], $this->decodeJson($this->client->get('/api/contacts'))['contacts']);
+        self::assertSame(404, $this->client->patch($url, ['json' => $data])->getStatusCode());
+        self::assertSame(404, $this->client->delete($url)->getStatusCode());
+        self::assertCount(1, $this->decodeJson($client->get('/api/contacts'))['contacts']);
+        $data['last_name'] = 'Byron';
+        self::assertSame(200, $client->patch($url, ['json' => $data])->getStatusCode());
+        self::assertSame('Byron', $this->decodeJson($client->get('/api/contacts'))['contacts'][0]['last_name']);
+        self::assertSame(200, $client->delete($url)->getStatusCode());
+        self::assertSame([], $this->decodeJson($client->get('/api/contacts'))['contacts']);
+
+        $response = $client->post('/api/auth/logout');
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(['success' => true], $this->decodeJson($response));
+        self::assertSame(401, $client->get('/api/contacts')->getStatusCode());
+        self::assertSame(401, $oldClient->get('/api/contacts', ['headers' => ['Cookie' => 'PHPSESSID=' . $loginSession]])->getStatusCode());
+    }
+
+    public function testDuplicateRegistrationReturnsJsonValidationError(): void
+    {
+        $email = bin2hex(random_bytes(16)) . '@example.com';
+        $this->extraUserIds[] = $this->users->create($email, password_hash('test-password', PASSWORD_DEFAULT));
+        $response = $this->client->post('/api/auth/register', ['json' => ['email' => $email, 'password' => 'test-password']]);
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame(['error' => 'Email address is already registered.'], $this->decodeJson($response));
+    }
+
+    public function testFailedLoginDoesNotAuthenticate(): void
+    {
+        $client = new Client(['base_uri' => self::$baseUrl, 'http_errors' => false, 'cookies' => new CookieJar()]);
+        $email = bin2hex(random_bytes(16)) . '@example.com';
+        $this->extraUserIds[] = $this->users->create($email, password_hash('correct-password', PASSWORD_DEFAULT));
+        foreach ([$email, 'missing-' . $email] as $loginEmail) {
+            $response = $client->post('/api/auth/login', ['json' => ['email' => $loginEmail, 'password' => 'wrong-password']]);
+            self::assertSame(401, $response->getStatusCode());
+            self::assertSame(['error' => 'Invalid Credentials'], $this->decodeJson($response));
+            self::assertSame(401, $client->get('/api/contacts')->getStatusCode());
+        }
+    }
+
+    public function testAuthenticationRejectsInvalidRequests(): void
+    {
+        foreach (['register', 'login', 'logout'] as $route) {
+            $response = $this->client->get('/api/auth/' . $route);
+            self::assertSame(405, $response->getStatusCode());
+            self::assertSame('POST', $response->getHeaderLine('Allow'));
+        }
+        foreach (['register', 'login'] as $route) {
+            $response = $this->client->post('/api/auth/' . $route, ['body' => '{']);
+            self::assertSame(400, $response->getStatusCode());
+            self::assertArrayHasKey('error', $this->decodeJson($response));
+            $response = $this->client->post('/api/auth/' . $route, ['json' => ['email' => []]]);
+            self::assertSame(422, $response->getStatusCode());
+        }
+        foreach ([['email' => 'invalid', 'password' => 'test'], ['email' => 'valid@example.com', 'password' => '  '], ['email' => 'valid@example.com', 'password' => str_repeat('x', 73)], ['email' => 'valid@example.com', 'password' => "test\0password"]] as $credentials) {
+            $response = $this->client->post('/api/auth/register', ['json' => $credentials]);
+            self::assertSame(422, $response->getStatusCode());
+            self::assertArrayHasKey('error', $this->decodeJson($response));
+        }
+    }
+
     public function testDatabaseFailureReturnsJson(): void
     {
         $envPath = self::$sessionDir . '/app/.env';
@@ -340,7 +440,7 @@ final class ApiIndexTest extends TestCase
         self::assertIsString($dotenv);
         try {
             file_put_contents($envPath, $dotenv . "\nDB_PORT=0\n");
-            $response = $this->client->get('/api/contacts');
+            $response = $this->client->post('/api/auth/login', ['json' => ['email' => 'test@example.com', 'password' => 'test']]);
             self::assertSame(500, $response->getStatusCode());
             self::assertSame(['error' => 'Unexpected server error'], $this->decodeJson($response));
         } finally {
@@ -368,6 +468,15 @@ final class ApiIndexTest extends TestCase
             self::assertSame(422, $this->client->patch('/api/contacts/' . $contactId, ['json' => $invalid])->getStatusCode());
         }
         self::assertSame('Ada', $this->decodeJson($this->client->get('/api/contacts'))['contacts'][0]['first_name']);
+    }
+
+    private function sessionId(CookieJar $cookies): string
+    {
+        $cookie = $cookies->getCookieByName('PHPSESSID');
+        self::assertNotNull($cookie);
+        $value = $cookie->getValue();
+        self::assertIsString($value);
+        return $value;
     }
 
     private static function findAvailablePort(): int

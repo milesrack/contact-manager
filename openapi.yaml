@@ -6,6 +6,73 @@ info:
   description: API for managing user contacts.
 
 paths:
+  /api/auth/register:
+    post:
+      summary: Create an account without logging in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+            example:
+              email: "ada@example.com"
+              password: "example-password"
+      responses:
+        "201":
+          $ref: "#/components/responses/AuthUserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/AuthValidationError"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/auth/login:
+    post:
+      summary: Log in and regenerate the session ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Credentials"
+            example:
+              email: "ada@example.com"
+              password: "example-password"
+      responses:
+        "200":
+          $ref: "#/components/responses/AuthUserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/AuthValidationError"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Invalid Credentials"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/auth/logout:
+    post:
+      summary: Destroy the session and expire its cookie
+      responses:
+        "200":
+          $ref: "#/components/responses/AuthLogoutResponse"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/contacts:
     get:
       summary: Search contacts
@@ -132,6 +199,56 @@ paths:
 
 components:
   responses:
+    AuthUserResponse:
+      description: Account created or login successful. Only login authenticates the session.
+      headers:
+        Set-Cookie:
+          description: PHPSESSID session cookie; login replaces the previous session ID.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [user_id]
+            properties:
+              user_id:
+                type: integer
+          example:
+            user_id: 123
+
+    AuthLogoutResponse:
+      description: Session destroyed. Also succeeds when already logged out.
+      headers:
+        Set-Cookie:
+          description: Expires the PHPSESSID cookie.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [success]
+            properties:
+              success:
+                type: boolean
+          example:
+            success: true
+
+    AuthValidationError:
+      description: Missing or invalid credentials, or email already registered.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            invalid_password:
+              value:
+                error: "Please enter a valid password."
+            duplicate_email:
+              value:
+                error: "Email address is already registered."
+
     MethodNotAllowed:
       description: Unsupported HTTP method
       headers:
@@ -270,6 +387,20 @@ components:
             error: "Unexpected server error"
 
   schemas:
+    Credentials:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          description: Registration requires a valid email address of at most 255 bytes.
+          example: "ada@example.com"
+        password:
+          type: string
+          minLength: 1
+          maxLength: 72
+          description: Must contain a non-whitespace character, contain no NUL bytes, and be at most 72 bytes for bcrypt. Passwords are not trimmed.
+
     ContactOutput:
       type: object
       required:

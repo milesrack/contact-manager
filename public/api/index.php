@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\AuthController;
 use App\ContactController;
 use App\Database;
+use App\UserRepository;
 
 ini_set('display_errors', '0');
 header('Content-Type: application/json');
@@ -39,6 +41,24 @@ function getJsonData(): array
     return $data;
 }
 
+/**
+ * @return array{email: string, password: string}
+ */
+function getCredentials(): array
+{
+    $data = getJsonData();
+    if (!isset($data['email'], $data['password'])) {
+        respond(['status' => 422, 'data' => ['error' => "JSON requires 'email' and 'password' fields"]]);
+    }
+    if (!is_string($data['email'])) {
+        respond(['status' => 422, 'data' => ['error' => 'Please enter a valid email address.']]);
+    }
+    if (!is_string($data['password'])) {
+        respond(['status' => 422, 'data' => ['error' => 'Please enter a valid password.']]);
+    }
+    return ['email' => $data['email'], 'password' => $data['password']];
+}
+
 try {
     require_once __DIR__ . '/../../config/bootstrap.php';
 
@@ -48,7 +68,29 @@ try {
         throw new RuntimeException('Unable to start session');
     }
 
-    if ($path === '/api/contacts') {
+    if ($path === '/api/auth/register') {
+        if ($method !== 'POST') {
+            header('Allow: POST');
+            respond(['status' => 405, 'data' => ['error' => 'Unsupported HTTP method']]);
+        }
+        $credentials = getCredentials();
+        $authController = new AuthController(new UserRepository(Database::connect()));
+        respond($authController->registerUser($credentials['email'], $credentials['password']));
+    } elseif ($path === '/api/auth/login') {
+        if ($method !== 'POST') {
+            header('Allow: POST');
+            respond(['status' => 405, 'data' => ['error' => 'Unsupported HTTP method']]);
+        }
+        $credentials = getCredentials();
+        $authController = new AuthController(new UserRepository(Database::connect()));
+        respond($authController->loginUser($credentials['email'], $credentials['password']));
+    } elseif ($path === '/api/auth/logout') {
+        if ($method !== 'POST') {
+            header('Allow: POST');
+            respond(['status' => 405, 'data' => ['error' => 'Unsupported HTTP method']]);
+        }
+        respond(AuthController::logoutUser());
+    } elseif ($path === '/api/contacts') {
         if ($method !== 'GET' && $method !== 'POST') {
             header('Allow: GET, POST');
             respond(['status' => 405, 'data' => ['error' => 'Unsupported HTTP method']]);
