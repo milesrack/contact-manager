@@ -3,6 +3,72 @@
 {% block title %}Contact Manager{% endblock %}
 
 {% block content %}
-  <h1 class="text-2xl font-semibold">Contact Manager</h1>
-  <p>Your contact manager is coming soon.</p>
+  <!-- Temporary borders before real styling -->
+  <style>
+    * {
+      border: 1px solid black;
+    }
+  </style>
+
+  <section>
+    <form data-search-form>
+      <input name="search-query" type="text" aria-label="Search contacts">
+      <button type="submit">Search</button>
+    </form>
+  </section>
+
+  <button data-create-button type="button">Create</button>
+  <!-- Input pane is used for updating and creating -->
+  <div data-input-pane hidden>
+    <form data-input-form>
+      <label for="input-first-name">First name</label>
+      <input id="input-first-name" name="input-first-name" type="text" required>
+      <br>
+      <label for="input-last-name">Last name</label>
+      <input id="input-last-name" name="input-last-name" type="text" required>
+      <br>
+      <label for="input-phone-number">Phone number</label>
+      <input id="input-phone-number" name="input-phone-number" type="text" required>
+      <br>
+      <label for="input-company">Company</label>
+      <input id="input-company" name="input-company" type="text">
+      <br>
+      <label for="input-email">Email</label>
+      <input id="input-email" name="input-email" type="email">
+      <br>
+      <button type="button">Cancel</button>
+      <button type="submit"></button>
+    </form>
+  </div>
+
+  <table>
+    <thead></thead>
+    <tbody data-contacts-tbody></tbody>
+  </table>
+
+  <template data-contact-template>
+    <tr>
+      <td>
+        <span data-collapsed>
+          <span data-contact-first-name></span>
+          <span data-contact-last-name></span>
+          <span data-contact-phone-number></span>
+        </span>
+        <span data-expanded hidden>
+          <span data-contact-first-name></span>
+          <span data-contact-last-name></span>
+          <span data-contact-phone-number></span>
+          <span data-contact-company></span>
+          <span data-contact-email></span>
+        </span>
+        <button data-edit-button>Edit</button>
+        <button data-delete-button>Delete</button>
+        <button data-expand-collapse-button>v</button>
+      </td>
+    </tr>
+  </template>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/js/contacts.js"></script>
 {% endblock %}
