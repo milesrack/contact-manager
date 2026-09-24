@@ -439,7 +439,7 @@ final class ApiIndexTest extends TestCase
         $cookies = new CookieJar();
         $client = new Client(['base_uri' => self::$baseUrl, 'http_errors' => false, 'cookies' => $cookies]);
         $email = bin2hex(random_bytes(16)) . '@example.com';
-        $credentials = ['email' => $email, 'password' => 'test-password'];
+        $credentials = ['email' => $email, 'password' => 'test-passphrase'];
         $response = $client->post('/api/auth/register', ['json' => $credentials]);
         self::assertSame(201, $response->getStatusCode());
         $userId = $this->decodeJson($response)['user_id'];
@@ -495,9 +495,49 @@ final class ApiIndexTest extends TestCase
     {
         $email = bin2hex(random_bytes(16)) . '@example.com';
         $this->extraUserIds[] = $this->users->create($email, password_hash('test-password', PASSWORD_DEFAULT));
-        $response = $this->client->post('/api/auth/register', ['json' => ['email' => $email, 'password' => 'test-password']]);
+        $response = $this->client->post('/api/auth/register', ['json' => ['email' => $email, 'password' => 'test-passphrase']]);
         self::assertSame(422, $response->getStatusCode());
         self::assertSame(['error' => 'Email address is already registered.'], $this->decodeJson($response));
+    }
+
+    public function testRegistrationPreservesPasswordsAndNormalisesEmail(): void
+    {
+        foreach ([str_repeat('a', 15), str_repeat('a', 72), str_repeat('é', 36), str_repeat('😀', 18), '  spaced passphrase  '] as $password) {
+            $email = bin2hex(random_bytes(16)) . '@example.com';
+            $client = new Client(['base_uri' => self::$baseUrl, 'http_errors' => false, 'cookies' => new CookieJar()]);
+            $credentials = ['email' => "\u{00A0} " . $email . "\t\u{2003}", 'password' => $password];
+            $response = $client->post('/api/auth/register', ['json' => $credentials]);
+            self::assertSame(201, $response->getStatusCode());
+            $this->extraUserIds[] = $this->decodeJson($response)['user_id'];
+            $account = $this->users->findByEmail($email);
+            self::assertNotNull($account);
+            self::assertTrue(password_verify($password, $account['password_hash']));
+            self::assertSame(200, $client->post('/api/auth/login', ['json' => $credentials])->getStatusCode());
+            if ($password !== trim($password)) {
+                self::assertFalse(password_verify(trim($password), $account['password_hash']));
+            }
+        }
+    }
+
+    public function testRegistrationRejectsInvalidPasswordBoundaries(): void
+    {
+        foreach ([str_repeat('a', 14), str_repeat('é', 14), str_repeat('a', 73), str_repeat('é', 37), str_repeat('😀', 19), str_repeat("\u{00A0}", 15), "long\0enough-passphrase"] as $password) {
+            $email = bin2hex(random_bytes(16)) . '@example.com';
+            $response = $this->client->post('/api/auth/register', ['json' => ['email' => $email, 'password' => $password]]);
+            self::assertSame(422, $response->getStatusCode());
+            self::assertArrayHasKey('error', $this->decodeJson($response));
+            self::assertNull($this->users->findByEmail($email));
+        }
+    }
+
+    public function testExistingShortPasswordStillLogsIn(): void
+    {
+        $email = bin2hex(random_bytes(16)) . '@example.com';
+        $this->extraUserIds[] = $this->users->create($email, password_hash('short', PASSWORD_DEFAULT));
+        $client = new Client(['base_uri' => self::$baseUrl, 'http_errors' => false, 'cookies' => new CookieJar()]);
+        $response = $client->post('/api/auth/login', ['json' => ['email' => $email, 'password' => 'short']]);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(200, $client->get('/api/contacts')->getStatusCode());
     }
 
     public function testFailedLoginDoesNotAuthenticate(): void

@@ -14,7 +14,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/Credentials"
+              $ref: "#/components/schemas/RegistrationCredentials"
             example:
               email: "ada@example.com"
               password: "example-password"
@@ -387,19 +387,33 @@ components:
             error: "Unexpected server error"
 
   schemas:
+    RegistrationCredentials:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          description: Surrounding Unicode whitespace is trimmed. Must pass PHP FILTER_VALIDATE_EMAIL and be at most 255 bytes. Case is preserved.
+          example: "ada@example.com"
+        password:
+          type: string
+          minLength: 15
+          maxLength: 72
+          description: At least 15 Unicode code points and at most 72 UTF-8 bytes. Must contain a non-whitespace character and no NUL bytes. Spaces and Unicode are accepted without composition rules. Passwords are never trimmed or truncated.
+
     Credentials:
       type: object
       required: [email, password]
       properties:
         email:
           type: string
-          description: Registration requires a valid email address of at most 255 bytes.
+          description: Surrounding Unicode whitespace is trimmed before looking up the account.
           example: "ada@example.com"
         password:
           type: string
           minLength: 1
           maxLength: 72
-          description: Must contain a non-whitespace character, contain no NUL bytes, and be at most 72 bytes for bcrypt. Passwords are not trimmed.
+          description: Must contain a non-whitespace character, contain no NUL bytes, and be at most 72 bytes for bcrypt. Passwords are not trimmed. The registration minimum does not apply to existing accounts at login.
 
     ContactOutput:
       type: object
