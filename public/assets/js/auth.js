@@ -13,7 +13,8 @@ toggle.hidden = false;
 toggle.addEventListener("click", () => {
   const show = password.type === "password";
   password.type = show ? "text" : "password";
-  toggle.textContent = show ? "Hide" : "Show";
+  toggle.querySelector("[data-eye]").toggleAttribute("hidden", show);
+  toggle.querySelector("[data-eye-off]").toggleAttribute("hidden", !show);
   toggle.setAttribute("aria-label", show ? "Hide password" : "Show password");
 });
 
