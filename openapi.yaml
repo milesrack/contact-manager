@@ -429,7 +429,7 @@ components:
 
     ContactInput:
       type: object
-      description: Fields are trimmed. Required fields must not be blank; blank optional fields become null. Length limits are enforced in bytes. PATCH requires all required fields.
+      description: Surrounding whitespace, including Unicode whitespace, is trimmed. Required fields must not be blank; blank optional fields become null. Length limits are enforced in UTF-8 bytes after trimming. PATCH requires all required fields.
       required:
         - first_name
         - last_name
@@ -447,6 +447,7 @@ components:
           type: string
           maxLength: 20
           minLength: 1
+          description: Formatting within the value is preserved; no country-specific validation or reformatting is applied.
         company:
           type: string
           maxLength: 255
@@ -455,6 +456,7 @@ components:
           type: string
           maxLength: 255
           nullable: true
+          description: When supplied and nonblank, must pass PHP FILTER_VALIDATE_EMAIL. Case is preserved. Unicode email addresses are not supported; international domains must use their ASCII (Punycode) form.
       example:
         first_name: "Ada"
         last_name: "Lovelace"
