@@ -5,7 +5,6 @@
       <button type="button" data-close aria-label="Close contact form" class="btn-text"><span aria-hidden="true" class="text-xl">×</span></button>
     </header>
     <div class="flex-1 space-y-5 px-6 py-6">
-      <p class="text-sm text-zinc-500">First name, last name and phone are required.</p>
       {% for field in [
         {name: 'first_name', label: 'First name', required: true, limit: 255},
         {name: 'last_name', label: 'Last name', required: true, limit: 255},
@@ -14,7 +13,7 @@
         {name: 'phone_number', label: 'Phone', required: true, limit: 20}
       ] %}
         <div>
-          <label for="contact-{{ field.name }}" class="block text-sm font-medium">{{ field.label }}{% if not field.required %} <span class="font-normal text-zinc-500">(optional)</span>{% endif %}</label>
+          <label for="contact-{{ field.name }}" class="block text-sm font-medium">{{ field.label }}{% if field.required %} <span aria-hidden="true" class="text-red-700">*</span><span class="sr-only"> (required)</span>{% else %} <span class="font-normal text-zinc-500">(optional)</span>{% endif %}</label>
           <input id="contact-{{ field.name }}" name="{{ field.name }}" type="{{ field.name == 'phone_number' ? 'tel' : 'text' }}" {% if field.name == 'email' %}inputmode="email"{% endif %} maxlength="{{ field.limit }}" {% if field.required %}required{% endif %} class="contact-input">
         </div>
       {% endfor %}
