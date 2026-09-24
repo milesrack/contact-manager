@@ -114,6 +114,9 @@ final class ApiIndexTest extends TestCase
             self::assertSame('email', $xpath->evaluate('string(//input[@name="email"]/@autocomplete)'));
             self::assertSame('password', $xpath->evaluate('string(//input[@name="password"]/@type)'));
             self::assertSame($autocomplete, $xpath->evaluate('string(//input[@name="password"]/@autocomplete)'));
+            self::assertSame(1.0, $xpath->evaluate('count(//button[@type="button"][@data-password-toggle][@aria-controls="password"][@aria-label="Show password"])'));
+            self::assertSame(2.0, $xpath->evaluate('count(//p[@data-field-error][@aria-live="polite"])'));
+            self::assertSame($path === '/register' ? (string) \App\AuthController::MIN_PASSWORD_LENGTH : '', $xpath->evaluate('string(//input[@name="password"]/@data-min-length)'));
             self::assertSame(2.0, $xpath->evaluate('count(//input[@required])'));
             self::assertSame(2.0, $xpath->evaluate('count(//label[@for = //input/@id][normalize-space()])'));
             self::assertSame(1.0, $xpath->evaluate('count(//form//*[@role="alert"])'));
@@ -448,6 +451,8 @@ final class ApiIndexTest extends TestCase
         $account = $this->users->findByEmail($email);
         self::assertNotNull($account);
         self::assertTrue(password_verify($credentials['password'], $account['password_hash']));
+        self::assertStringContainsString('Account created. Log in to continue.', (string) $client->get('/login')->getBody());
+        self::assertStringNotContainsString('Account created. Log in to continue.', (string) $client->get('/login')->getBody());
         self::assertSame(401, $client->get('/api/contacts')->getStatusCode());
         $oldSession = $this->sessionId($cookies);
         self::assertNotSame('', $oldSession);

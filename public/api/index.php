@@ -75,7 +75,11 @@ try {
         }
         $credentials = getCredentials();
         $authController = new AuthController(new UserRepository(Database::connect()));
-        respond($authController->registerUser($credentials['email'], $credentials['password']));
+        $result = $authController->registerUser($credentials['email'], $credentials['password']);
+        if ($result['status'] === 201) {
+            $_SESSION['registration_complete'] = true;
+        }
+        respond($result);
     } elseif ($path === '/api/auth/login') {
         if ($method !== 'POST') {
             header('Allow: POST');
