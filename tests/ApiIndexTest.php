@@ -114,6 +114,9 @@ final class ApiIndexTest extends TestCase
             self::assertSame('email', $xpath->evaluate('string(//input[@name="email"]/@autocomplete)'));
             self::assertSame('password', $xpath->evaluate('string(//input[@name="password"]/@type)'));
             self::assertSame($autocomplete, $xpath->evaluate('string(//input[@name="password"]/@autocomplete)'));
+            self::assertSame(1.0, $xpath->evaluate('count(//button[@type="button"][@data-password-toggle][@aria-controls="password"][@aria-label="Show password"])'));
+            self::assertSame(2.0, $xpath->evaluate('count(//p[@data-field-error][@aria-live="polite"])'));
+            self::assertSame($path === '/register' ? (string) \App\AuthController::MIN_PASSWORD_LENGTH : '', $xpath->evaluate('string(//input[@name="password"]/@data-min-length)'));
             self::assertSame(2.0, $xpath->evaluate('count(//input[@required])'));
             self::assertSame(2.0, $xpath->evaluate('count(//label[@for = //input/@id][normalize-space()])'));
             self::assertSame(1.0, $xpath->evaluate('count(//form//*[@role="alert"])'));
@@ -125,13 +128,39 @@ final class ApiIndexTest extends TestCase
     {
         $response = $this->client->get('/');
         self::assertSame(200, $response->getStatusCode());
-        self::assertMatchesRegularExpression('/<h1[^>]*>Contact Manager<\/h1>/', (string) $response->getBody());
+        self::assertMatchesRegularExpression('/<h1[^>]*>Contacts<\/h1>/', (string) $response->getBody());
 
         foreach (['/login', '/register'] as $path) {
             $response = $this->client->get($path);
             self::assertSame(302, $response->getStatusCode());
             self::assertSame('/', $response->getHeaderLine('Location'));
         }
+    }
+
+    public function testContactPageProvidesLabelledFieldsAndDialogs(): void
+    {
+        $response = $this->client->get('/');
+        $document = new \DOMDocument();
+        $document->loadHTML((string) $response->getBody(), LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new \DOMXPath($document);
+        foreach (['contact', 'delete', 'discard'] as $dialog) {
+            self::assertTrue($xpath->evaluate('boolean(//dialog[@data-' . $dialog . '-dialog]//h2[@id = ancestor::dialog/@aria-labelledby][normalize-space()])'));
+        }
+        self::assertSame(5.0, $xpath->evaluate('count(//form[@data-contact-form]//input)'));
+        foreach (['first_name', 'last_name', 'phone_number', 'company', 'email'] as $field) {
+            $input = '//form[@data-contact-form]//input[@name="' . $field . '"]';
+            self::assertSame(1.0, $xpath->evaluate('count(//label[@for = ' . $input . '/@id][normalize-space()])'));
+            self::assertSame(
+                in_array($field, ['first_name', 'last_name', 'phone_number'], true),
+                $xpath->evaluate('boolean(' . $input . '/@required)'),
+            );
+            self::assertSame($field === 'phone_number' ? '20' : '255', $xpath->evaluate('string(' . $input . '/@maxlength)'));
+        }
+        self::assertSame('email', $xpath->evaluate('string(//form[@data-contact-form]//input[@name="email"]/@type)'));
+        self::assertSame('tel', $xpath->evaluate('string(//form[@data-contact-form]//input[@name="phone_number"]/@type)'));
+        self::assertSame(5.0, $xpath->evaluate('count(//form[@data-contact-form]//p[@data-field-error][@aria-live="polite"])'));
+        self::assertSame(1.0, $xpath->evaluate('count(//label[@for = //input[@type="search"]/@id][normalize-space()])'));
+        self::assertSame('/assets/js/contacts.js', $xpath->evaluate('string(//script[@type="module"]/@src)'));
     }
 
     public function testInvalidSessionUserIdsDoNotAuthenticateFrontend(): void
@@ -413,7 +442,7 @@ final class ApiIndexTest extends TestCase
         $cookies = new CookieJar();
         $client = new Client(['base_uri' => self::$baseUrl, 'http_errors' => false, 'cookies' => $cookies]);
         $email = bin2hex(random_bytes(16)) . '@example.com';
-        $credentials = ['email' => $email, 'password' => 'test-password'];
+        $credentials = ['email' => $email, 'password' => 'test-passphrase'];
         $response = $client->post('/api/auth/register', ['json' => $credentials]);
         self::assertSame(201, $response->getStatusCode());
         $userId = $this->decodeJson($response)['user_id'];
@@ -422,6 +451,8 @@ final class ApiIndexTest extends TestCase
         $account = $this->users->findByEmail($email);
         self::assertNotNull($account);
         self::assertTrue(password_verify($credentials['password'], $account['password_hash']));
+        self::assertStringContainsString('Account created. Log in to continue.', (string) $client->get('/login')->getBody());
+        self::assertStringNotContainsString('Account created. Log in to continue.', (string) $client->get('/login')->getBody());
         self::assertSame(401, $client->get('/api/contacts')->getStatusCode());
         $oldSession = $this->sessionId($cookies);
         self::assertNotSame('', $oldSession);
@@ -469,9 +500,49 @@ final class ApiIndexTest extends TestCase
     {
         $email = bin2hex(random_bytes(16)) . '@example.com';
         $this->extraUserIds[] = $this->users->create($email, password_hash('test-password', PASSWORD_DEFAULT));
-        $response = $this->client->post('/api/auth/register', ['json' => ['email' => $email, 'password' => 'test-password']]);
+        $response = $this->client->post('/api/auth/register', ['json' => ['email' => $email, 'password' => 'test-passphrase']]);
         self::assertSame(422, $response->getStatusCode());
         self::assertSame(['error' => 'Email address is already registered.'], $this->decodeJson($response));
+    }
+
+    public function testRegistrationPreservesPasswordsAndNormalisesEmail(): void
+    {
+        foreach ([str_repeat('a', 15), str_repeat('a', 72), str_repeat('é', 36), str_repeat('😀', 18), '  spaced passphrase  '] as $password) {
+            $email = bin2hex(random_bytes(16)) . '@example.com';
+            $client = new Client(['base_uri' => self::$baseUrl, 'http_errors' => false, 'cookies' => new CookieJar()]);
+            $credentials = ['email' => "\u{00A0} " . $email . "\t\u{2003}", 'password' => $password];
+            $response = $client->post('/api/auth/register', ['json' => $credentials]);
+            self::assertSame(201, $response->getStatusCode());
+            $this->extraUserIds[] = $this->decodeJson($response)['user_id'];
+            $account = $this->users->findByEmail($email);
+            self::assertNotNull($account);
+            self::assertTrue(password_verify($password, $account['password_hash']));
+            self::assertSame(200, $client->post('/api/auth/login', ['json' => $credentials])->getStatusCode());
+            if ($password !== trim($password)) {
+                self::assertFalse(password_verify(trim($password), $account['password_hash']));
+            }
+        }
+    }
+
+    public function testRegistrationRejectsInvalidPasswordBoundaries(): void
+    {
+        foreach ([str_repeat('a', 14), str_repeat('é', 14), str_repeat('a', 73), str_repeat('é', 37), str_repeat('😀', 19), str_repeat("\u{00A0}", 15), "long\0enough-passphrase"] as $password) {
+            $email = bin2hex(random_bytes(16)) . '@example.com';
+            $response = $this->client->post('/api/auth/register', ['json' => ['email' => $email, 'password' => $password]]);
+            self::assertSame(422, $response->getStatusCode());
+            self::assertArrayHasKey('error', $this->decodeJson($response));
+            self::assertNull($this->users->findByEmail($email));
+        }
+    }
+
+    public function testExistingShortPasswordStillLogsIn(): void
+    {
+        $email = bin2hex(random_bytes(16)) . '@example.com';
+        $this->extraUserIds[] = $this->users->create($email, password_hash('short', PASSWORD_DEFAULT));
+        $client = new Client(['base_uri' => self::$baseUrl, 'http_errors' => false, 'cookies' => new CookieJar()]);
+        $response = $client->post('/api/auth/login', ['json' => ['email' => $email, 'password' => 'short']]);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(200, $client->get('/api/contacts')->getStatusCode());
     }
 
     public function testFailedLoginDoesNotAuthenticate(): void

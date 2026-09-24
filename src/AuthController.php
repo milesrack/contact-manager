@@ -8,16 +8,27 @@ use PDOException;
 
 final class AuthController
 {
+    public const MIN_PASSWORD_LENGTH = 15;
+
     public function __construct(private readonly UserRepository $userRepository) {}
 
     /** @return array{status: int, data: array<string, mixed>} */
     public function registerUser(string $email, string $password): array
     {
+        $email = $this->normaliseEmail($email);
         if (strlen($email) > 255 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return ['status' => 422, 'data' => ['error' => "Please enter a valid email address."]];
         }
         if (!$this->isValidPassword($password)) {
             return ['status' => 422, 'data' => ['error' => "Please enter a valid password."]];
+        }
+
+        $length = preg_match_all('/./us', $password);
+        if ($length === false || preg_match('/[^\s\p{Z}\x{FEFF}]/u', $password) !== 1) {
+            return ['status' => 422, 'data' => ['error' => "Please enter a valid password."]];
+        }
+        if ($length < self::MIN_PASSWORD_LENGTH) {
+            return ['status' => 422, 'data' => ['error' => 'Use at least ' . self::MIN_PASSWORD_LENGTH . ' characters for your password.']];
         }
 
         $hashedPass = password_hash($password, PASSWORD_DEFAULT);
@@ -37,6 +48,7 @@ final class AuthController
     /** @return array{status: int, data: array<string, mixed>} */
     public function loginUser(string $email, string $password): array
     {
+        $email = $this->normaliseEmail($email);
         if (!$this->isValidPassword($password)) {
             return ['status' => 422, 'data' => ['error' => "Please enter a valid password."]];
         }
@@ -81,5 +93,10 @@ final class AuthController
     private function isValidPassword(string $password): bool
     {
         return trim($password) !== '' && strlen($password) <= 72 && !str_contains($password, "\0");
+    }
+
+    private function normaliseEmail(string $email): string
+    {
+        return preg_replace('/^[\s\p{Z}\x{FEFF}]+|[\s\p{Z}\x{FEFF}]+$/u', '', $email) ?? '';
     }
 }

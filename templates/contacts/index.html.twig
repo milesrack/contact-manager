@@ -1,8 +1,63 @@
 {% extends "base.html.twig" %}
 
-{% block title %}Contact Manager{% endblock %}
+{% block title %}Contacts | Contact Manager{% endblock %}
+{% block header %}{% include "auth/nav.html.twig" with {authenticated: true} %}{% endblock %}
+{% block main_class %}mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10{% endblock %}
 
 {% block content %}
-  <h1 class="text-2xl font-semibold">Contact Manager</h1>
-  <p>Your contact manager is coming soon.</p>
+  <p data-logout-error role="alert" class="mb-4 text-sm text-red-700 empty:hidden"></p>
+  <section aria-labelledby="contacts-heading">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h1 id="contacts-heading" class="text-2xl font-semibold tracking-tight">Contacts</h1>
+        <p class="mt-2 text-sm text-zinc-600">Manage and search your contacts.</p>
+      </div>
+      <button type="button" data-add class="btn-primary"><span aria-hidden="true">+</span> Add contact</button>
+    </div>
+
+    <div class="mt-8">
+      <label for="contact-search" class="block text-sm font-medium">Search contacts</label>
+      <div class="relative mt-2">
+        <svg aria-hidden="true" class="pointer-events-none absolute top-3.5 left-3 size-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
+        <input id="contact-search" type="search" placeholder="Search contacts..." autocomplete="off" class="contact-input mt-0 pl-10">
+      </div>
+    </div>
+
+    <p data-status role="status" aria-atomic="true" class="min-h-10 py-3 text-xs text-zinc-500">Loading contacts...</p>
+    <div data-list-error hidden class="mb-4 rounded-lg border border-red-200 p-3">
+      <p data-list-error-message role="alert" class="text-sm text-red-700"></p>
+      <button type="button" data-retry class="btn-secondary mt-3">Try again</button>
+    </div>
+    <div data-results aria-busy="true">
+      <div data-skeleton aria-hidden="true" class="divide-y divide-zinc-100 rounded-xl border border-zinc-200 px-4">
+        {% for row in 1..4 %}
+          <div class="flex gap-8 py-5"><span class="h-3 w-1/3 rounded bg-zinc-100"></span><span class="h-3 w-1/4 rounded bg-zinc-100"></span></div>
+        {% endfor %}
+      </div>
+      <div data-contact-list hidden class="overflow-hidden rounded-xl border border-zinc-200">
+        <div aria-hidden="true" class="hidden grid-cols-[1.3fr_1fr_1.5fr_1fr_auto] gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-medium text-zinc-500 md:grid">
+          <span>Name</span><span>Company</span><span>Email</span><span>Phone</span><span class="w-20">Actions</span>
+        </div>
+        <ul data-contacts aria-label="Contacts" class="divide-y divide-zinc-200"></ul>
+      </div>
+      <div data-empty hidden class="rounded-xl border border-zinc-200 px-4 py-12 text-center">
+        <svg aria-hidden="true" class="mx-auto mb-4 size-6 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="3" width="15" height="18" rx="2" /><path d="M3 7h4M3 12h4M3 17h4" /><circle cx="12.5" cy="9" r="2" /><path d="M9 17v-1a3.5 3.5 0 0 1 7 0v1" /></svg>
+        <h2 class="text-sm font-semibold">No contacts yet</h2>
+        <p class="mt-2 text-sm text-zinc-600">Add your first contact to get started.</p>
+        <button type="button" data-add class="btn-primary mt-5">Add contact</button>
+      </div>
+      <div data-no-results hidden class="py-8 text-center text-sm">
+        <p data-no-results-message class="font-medium break-words"></p>
+        <p class="mt-2 text-zinc-600">Try another search.</p>
+      </div>
+    </div>
+    <div class="mt-5 flex justify-center"><button type="button" data-load-more hidden class="btn-secondary">Load more</button></div>
+    <noscript><p class="mt-4 text-sm text-red-700">Enable JavaScript to manage your contacts.</p></noscript>
+  </section>
+  {% include "components/contact-card.html.twig" %}
+  {% include "components/contact-form.html.twig" %}
+  {% include "components/delete-modal.html.twig" %}
+  {% include "components/discard-modal.html.twig" %}
 {% endblock %}
+
+{% block scripts %}<script type="module" src="/assets/js/contacts.js"></script>{% endblock %}

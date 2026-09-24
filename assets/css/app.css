@@ -1,1 +1,29 @@
 @import "tailwindcss";
+
+@layer components {
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-text {
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950 disabled:cursor-wait disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-zinc-950 text-white hover:bg-zinc-800 active:bg-zinc-700;
+  }
+  .btn-secondary {
+    @apply border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100;
+  }
+  .btn-danger {
+    @apply bg-red-700 text-white hover:bg-red-800 active:bg-red-900;
+  }
+  .btn-text {
+    @apply text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 active:bg-zinc-200;
+  }
+  .contact-input {
+    @apply mt-2 block h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-base text-zinc-950 transition-colors duration-150 hover:border-zinc-400 focus:border-zinc-950 focus:outline-2 focus:outline-offset-2 focus:outline-zinc-950 disabled:bg-zinc-50;
+  }
+}
+
+body:has(dialog[open]) {
+  overflow: hidden;
+}

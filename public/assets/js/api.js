@@ -1,12 +1,18 @@
 export async function requestJson(url, options = {}) {
+  const { redirectOnUnauthorized = false, ...fetchOptions } = options;
   let response;
   try {
     response = await fetch(url, {
-      ...options,
+      ...fetchOptions,
       headers: { Accept: "application/json", ...options.headers },
     });
   } catch {
     throw new Error("Unable to connect. Please try again.");
+  }
+
+  if (response.status === 401 && redirectOnUnauthorized) {
+    window.location.assign("/login");
+    throw new Error("Your session has expired. Please log in again.");
   }
 
   let data;

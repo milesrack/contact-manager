@@ -178,13 +178,18 @@ final class ContactController
             return null;
         }
 
-        $data['first_name'] = trim($data['first_name']);
-        $data['last_name'] = trim($data['last_name']);
-        $data['phone_number'] = trim($data['phone_number']);
-        foreach (['company', 'email'] as $field) {
+        foreach (['first_name', 'last_name', 'phone_number', 'company', 'email'] as $field) {
             if ($data[$field] !== null) {
-                $value = trim($data[$field]);
-                $data[$field] = $value === '' ? null : $value;
+                $value = preg_replace('/^[\s\p{Z}\x{FEFF}]+|[\s\p{Z}\x{FEFF}]+$/u', '', $data[$field]);
+                if ($value === null) {
+                    return null;
+                }
+                $data[$field] = $value;
+            }
+        }
+        foreach (['company', 'email'] as $field) {
+            if ($data[$field] === '') {
+                $data[$field] = null;
             }
         }
 
@@ -205,6 +210,10 @@ final class ContactController
             || ($data['company'] !== null && strlen($data['company']) > 255)
             || ($data['email'] !== null && strlen($data['email']) > 255)
         ) {
+            return null;
+        }
+
+        if ($data['email'] !== null && filter_var($data['email'], FILTER_VALIDATE_EMAIL) === false) {
             return null;
         }
 

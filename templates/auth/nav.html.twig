@@ -9,9 +9,13 @@
       </svg>
       Contact Manager
     </a>
+    {% if authenticated|default(false) %}
+      <button type="button" data-logout class="btn-secondary">Log out</button>
+    {% else %}
     <div class="flex items-center gap-1 sm:gap-2">
       <a href="/login" class="inline-flex min-h-10 items-center rounded-lg px-2 text-sm font-medium text-zinc-600 transition-colors duration-150 hover:bg-zinc-100 hover:text-zinc-950 active:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950 sm:px-3">Log in</a>
       <a href="/register" class="inline-flex min-h-10 items-center rounded-lg bg-zinc-950 px-3 text-sm font-medium text-white transition-colors duration-150 hover:bg-zinc-800 active:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-950">Sign up</a>
     </div>
+    {% endif %}
   </nav>
 </header>
