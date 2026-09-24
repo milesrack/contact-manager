@@ -18,7 +18,6 @@ toggle.addEventListener("click", () => {
 });
 
 function clearError(input) {
-  input.setCustomValidity("");
   input.removeAttribute("aria-invalid");
   document.getElementById(`${input.id}-error`).textContent = "";
 }
@@ -43,7 +42,6 @@ function validate(input) {
   } else if (new TextEncoder().encode(input.value).length > 72) {
     message = "Use no more than 72 bytes; some characters use more than one.";
   }
-  input.setCustomValidity(message);
   if (message) input.setAttribute("aria-invalid", "true");
   document.getElementById(`${input.id}-error`).textContent = message;
   return !message;
@@ -64,7 +62,6 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
-  const fields = new FormData(form);
   button.disabled = true;
   button.textContent = form.dataset.pending;
   error.textContent = "";
@@ -74,8 +71,8 @@ form.addEventListener("submit", async (event) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: fields.get("email"),
-        password: fields.get("password"),
+        email: email.value,
+        password: password.value,
       }),
     });
     window.location.assign(form.dataset.redirect);
