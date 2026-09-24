@@ -31,8 +31,13 @@ function renderContact(contact) {
   const row = template.content.firstElementChild.cloneNode(true);
   const name = `${contact.first_name} ${contact.last_name}`;
   row.querySelector("[data-name]").textContent = name;
-  row.querySelector("[data-company]").textContent = contact.company || "—";
-  row.querySelector("[data-email]").textContent = contact.email || "—";
+  for (const field of ["company", "email"]) {
+    const element = row.querySelector(`[data-${field}]`);
+    const value = contact[field] || "";
+    element.textContent = value;
+    element.parentElement.classList.toggle("hidden", !value);
+    element.parentElement.setAttribute("aria-hidden", String(!value));
+  }
   row.querySelector("[data-phone]").textContent = contact.phone_number;
   for (const action of ["edit", "delete"]) {
     const button = row.querySelector(`[data-${action}]`);
