@@ -140,7 +140,7 @@ final class ApiIndexTest extends TestCase
         $document = new \DOMDocument();
         $document->loadHTML((string) $response->getBody(), LIBXML_NOERROR | LIBXML_NOWARNING);
         $xpath = new \DOMXPath($document);
-        self::assertSame(2.0, $xpath->evaluate('count(//dialog[@aria-labelledby])'));
+        self::assertSame(3.0, $xpath->evaluate('count(//dialog[@aria-labelledby])'));
         self::assertSame(2.0, $xpath->evaluate('count(//dialog//p[@role="alert"])'));
         self::assertSame(5.0, $xpath->evaluate('count(//form[@data-contact-form]//input)'));
         foreach (['first_name', 'last_name', 'phone_number', 'company', 'email'] as $field) {
@@ -152,6 +152,9 @@ final class ApiIndexTest extends TestCase
             );
             self::assertSame($field === 'phone_number' ? '20' : '255', $xpath->evaluate('string(' . $input . '/@maxlength)'));
         }
+        self::assertSame('email', $xpath->evaluate('string(//form[@data-contact-form]//input[@name="email"]/@type)'));
+        self::assertSame('tel', $xpath->evaluate('string(//form[@data-contact-form]//input[@name="phone_number"]/@type)'));
+        self::assertSame(5.0, $xpath->evaluate('count(//form[@data-contact-form]//p[@data-field-error][@aria-live="polite"])'));
         self::assertSame(1.0, $xpath->evaluate('count(//label[@for = //input[@type="search"]/@id][normalize-space()])'));
         self::assertSame('/assets/js/contacts.js', $xpath->evaluate('string(//script[@type="module"]/@src)'));
     }

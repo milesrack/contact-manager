@@ -1,5 +1,5 @@
 <dialog data-contact-dialog aria-labelledby="contact-form-title" class="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-none w-full max-w-none border-l border-zinc-200 bg-white p-0 text-zinc-950 backdrop:bg-zinc-950/30 sm:max-w-md">
-  <form data-contact-form class="flex min-h-full flex-col" autocomplete="off">
+  <form data-contact-form novalidate class="flex min-h-full flex-col" autocomplete="off">
     <header class="flex items-center justify-between gap-4 border-b border-zinc-200 px-6 py-4">
       <h2 id="contact-form-title" class="text-lg font-semibold tracking-tight">Add contact</h2>
       <button type="button" data-close aria-label="Close contact form" class="btn-text"><span aria-hidden="true" class="text-xl">×</span></button>
@@ -14,7 +14,8 @@
       ] %}
         <div>
           <label for="contact-{{ field.name }}" class="block text-sm font-medium">{{ field.label }}{% if field.required %} <span aria-hidden="true" class="text-red-700">*</span><span class="sr-only"> (required)</span>{% else %} <span class="font-normal text-zinc-500">(optional)</span>{% endif %}</label>
-          <input id="contact-{{ field.name }}" name="{{ field.name }}" type="{{ field.name == 'phone_number' ? 'tel' : 'text' }}" {% if field.name == 'email' %}inputmode="email"{% endif %} maxlength="{{ field.limit }}" {% if field.required %}required{% endif %} class="contact-input">
+          <input id="contact-{{ field.name }}" name="{{ field.name }}" type="{{ field.name == 'phone_number' ? 'tel' : (field.name == 'email' ? 'email' : 'text') }}" maxlength="{{ field.limit }}" data-byte-limit="{{ field.limit }}" aria-describedby="contact-{{ field.name }}-error" {% if field.required %}required{% endif %} class="contact-input aria-invalid:border-red-700">
+          <p id="contact-{{ field.name }}-error" data-field-error aria-live="polite" class="mt-2 text-sm text-red-700 empty:hidden"></p>
         </div>
       {% endfor %}
       <p data-form-error role="alert" aria-atomic="true" class="text-sm leading-6 text-red-700"></p>
