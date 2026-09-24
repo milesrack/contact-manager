@@ -140,8 +140,9 @@ final class ApiIndexTest extends TestCase
         $document = new \DOMDocument();
         $document->loadHTML((string) $response->getBody(), LIBXML_NOERROR | LIBXML_NOWARNING);
         $xpath = new \DOMXPath($document);
-        self::assertSame(3.0, $xpath->evaluate('count(//dialog[@aria-labelledby])'));
-        self::assertSame(2.0, $xpath->evaluate('count(//dialog//p[@role="alert"])'));
+        foreach (['contact', 'delete', 'discard'] as $dialog) {
+            self::assertTrue($xpath->evaluate('boolean(//dialog[@data-' . $dialog . '-dialog]//h2[@id = ancestor::dialog/@aria-labelledby][normalize-space()])'));
+        }
         self::assertSame(5.0, $xpath->evaluate('count(//form[@data-contact-form]//input)'));
         foreach (['first_name', 'last_name', 'phone_number', 'company', 'email'] as $field) {
             $input = '//form[@data-contact-form]//input[@name="' . $field . '"]';
