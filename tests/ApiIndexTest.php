@@ -125,13 +125,35 @@ final class ApiIndexTest extends TestCase
     {
         $response = $this->client->get('/');
         self::assertSame(200, $response->getStatusCode());
-        self::assertMatchesRegularExpression('/<h1[^>]*>Contact Manager<\/h1>/', (string) $response->getBody());
+        self::assertMatchesRegularExpression('/<h1[^>]*>Contacts<\/h1>/', (string) $response->getBody());
 
         foreach (['/login', '/register'] as $path) {
             $response = $this->client->get($path);
             self::assertSame(302, $response->getStatusCode());
             self::assertSame('/', $response->getHeaderLine('Location'));
         }
+    }
+
+    public function testContactPageProvidesLabelledFieldsAndDialogs(): void
+    {
+        $response = $this->client->get('/');
+        $document = new \DOMDocument();
+        $document->loadHTML((string) $response->getBody(), LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new \DOMXPath($document);
+        self::assertSame(2.0, $xpath->evaluate('count(//dialog[@aria-labelledby])'));
+        self::assertSame(2.0, $xpath->evaluate('count(//dialog//p[@role="alert"])'));
+        self::assertSame(5.0, $xpath->evaluate('count(//form[@data-contact-form]//input)'));
+        foreach (['first_name', 'last_name', 'phone_number', 'company', 'email'] as $field) {
+            $input = '//form[@data-contact-form]//input[@name="' . $field . '"]';
+            self::assertSame(1.0, $xpath->evaluate('count(//label[@for = ' . $input . '/@id][normalize-space()])'));
+            self::assertSame(
+                in_array($field, ['first_name', 'last_name', 'phone_number'], true),
+                $xpath->evaluate('boolean(' . $input . '/@required)'),
+            );
+            self::assertSame($field === 'phone_number' ? '20' : '255', $xpath->evaluate('string(' . $input . '/@maxlength)'));
+        }
+        self::assertSame(1.0, $xpath->evaluate('count(//label[@for = //input[@type="search"]/@id][normalize-space()])'));
+        self::assertSame('/assets/js/contacts.js', $xpath->evaluate('string(//script[@type="module"]/@src)'));
     }
 
     public function testInvalidSessionUserIdsDoNotAuthenticateFrontend(): void

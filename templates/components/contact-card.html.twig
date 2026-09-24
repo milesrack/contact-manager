@@ -1,0 +1,12 @@
+<template data-contact-template>
+  <li class="grid min-w-0 gap-1 px-4 py-4 text-sm md:grid-cols-[1.3fr_1fr_1.5fr_1fr_auto] md:items-center md:gap-4 md:py-2">
+    <h2 data-name class="min-w-0 font-medium break-words"></h2>
+    <p class="min-w-0 break-words text-zinc-600"><span class="sr-only">Company: </span><span data-company></span></p>
+    <p class="mt-2 min-w-0 break-words text-zinc-600 md:mt-0"><span class="sr-only">Email: </span><span data-email></span></p>
+    <p class="min-w-0 break-words text-zinc-600"><span class="sr-only">Phone: </span><span data-phone></span></p>
+    <div class="-ml-3 mt-2 flex md:ml-0 md:mt-0">
+      <button type="button" data-edit class="btn-text">Edit</button>
+      <button type="button" data-delete class="btn-text text-red-700 hover:bg-red-50 hover:text-red-800 active:bg-red-100">Delete</button>
+    </div>
+  </li>
+</template>

@@ -1,315 +1,264 @@
 import { requestJson } from "./api.js";
 
-const contactsTbody = document.querySelector("[data-contacts-tbody]");
-const contactTemplate = document.querySelector("[data-contact-template]");
-let progress = {
-  searching: false,
-  creating: false,
-  updating: false,
-  deleting: false,
+const search = document.querySelector("#contact-search");
+const list = document.querySelector("[data-contacts]");
+const template = document.querySelector("[data-contact-template]");
+const status = document.querySelector("[data-status]");
+const results = document.querySelector("[data-results]");
+const listError = document.querySelector("[data-list-error]");
+const loadMore = document.querySelector("[data-load-more]");
+const contactDialog = document.querySelector("[data-contact-dialog]");
+const contactForm = document.querySelector("[data-contact-form]");
+const deleteDialog = document.querySelector("[data-delete-dialog]");
+const deleteForm = document.querySelector("[data-delete-form]");
+const contacts = new Map();
+const limit = 50;
+let afterId = null;
+let generation = 0;
+let debounce;
+let loading = false;
+let retryAppend = false;
+let editingId = null;
+let deletingId = null;
+
+// Authentication handling remains in the shared request helper; login failures
+// on the public authentication pages must still display their inline errors.
+function request(url, options = {}) {
+  return requestJson(url, { ...options, redirectOnUnauthorized: true });
 }
 
-// -- Helper functions for modifying contacts in the DOM -----------------------
-
-// Get contact element from contact ID
-function getContactEl(contactId) {
-  return contactsTbody.querySelector(`[data-contact-id="${contactId}"]`);
-}
-
-// Ensure contact element is in sorted position
-function sortContactEl(contactId) {
-  const contacts = Array.from(contactsTbody.children);
-  const insertContact = getContactEl(contactId);
-
-  const nextContact = contacts.find(contact => {
-    const lastNameComparison = contact.dataset.lastName.localeCompare(insertContact.dataset.lastName);
-
-    if (lastNameComparison !== 0) {
-      return lastNameComparison > 0;
-    }
-
-    return Number(contact.dataset.contactId) > Number(insertContact.dataset.contactId);
-  });
-
-  contactsTbody.insertBefore(insertContact, nextContact || null);
-}
-
-// Create and set up contact element given data
-function createContactEl(data) {
-  const newContactFragment = contactTemplate.content.cloneNode(true);
-  const newContact = newContactFragment.firstElementChild;
-
-  const editButton = newContact.querySelector("[data-edit-button]");
-  const deleteButton = newContact.querySelector("[data-delete-button]");
-  const expandCollapseButton = newContact.querySelector("[data-expand-collapse-button]");
-
-  // Setup events
-  editButton.addEventListener("click", () => {
-    handleUpdatePaneOpen(data.contact_id);
-  });
-
-  deleteButton.addEventListener("click", async () => {
-    await handleDelete(data.contact_id);
-  });
-
-  const collapsed = newContact.querySelector("[data-collapsed]");
-  const expanded = newContact.querySelector("[data-expanded]");
-  expandCollapseButton.addEventListener("click", () => {
-    if (expanded.hidden) {
-      expandCollapseButton.innerText = "^";
-      expanded.hidden = false;
-      collapsed.hidden = true;
-    } else {
-      expandCollapseButton.innerText = "v";
-      expanded.hidden = true;
-      collapsed.hidden = false;
-    }
-  });
-
-  // Set data to be used for reading
-  newContact.dataset.contactId = data.contact_id;
-  newContact.dataset.firstName = data.first_name;
-  newContact.dataset.lastName = data.last_name;
-  newContact.dataset.phoneNumber = data.phone_number;
-  newContact.dataset.company = data.company ?? "";
-  newContact.dataset.email = data.email ?? "";
-
-  // Fill contact data fields and insert to sorted position
-  contactsTbody.appendChild(newContact);
-  updateContactEl(data.contact_id);
-}
-
-// Create contact elements for the given array
-function createContactEls(contacts) {
-  contacts.forEach(createContactEl);
-}
-
-// Find in DOM, update contact element to match dataset data, update sorted position
-function updateContactEl(contactId) {
-  const contact = getContactEl(contactId);
-
-  function setAllTextContent(querySelector, text) {
-    contact.querySelectorAll(querySelector).forEach((el) => {
-      el.textContent = text;
-    });
+function renderContact(contact) {
+  const row = template.content.firstElementChild.cloneNode(true);
+  const name = `${contact.first_name} ${contact.last_name}`;
+  row.querySelector("[data-name]").textContent = name;
+  row.querySelector("[data-company]").textContent = contact.company || "—";
+  row.querySelector("[data-email]").textContent = contact.email || "—";
+  row.querySelector("[data-phone]").textContent = contact.phone_number;
+  for (const action of ["edit", "delete"]) {
+    const button = row.querySelector(`[data-${action}]`);
+    button.dataset.contactId = contact.contact_id;
+    button.setAttribute(
+      "aria-label",
+      `${action === "edit" ? "Edit" : "Delete"} ${name}`,
+    );
   }
-  setAllTextContent("[data-contact-first-name]", contact.dataset.firstName);
-  setAllTextContent("[data-contact-last-name]", contact.dataset.lastName);
-  setAllTextContent("[data-contact-phone-number]", contact.dataset.phoneNumber);
-  setAllTextContent("[data-contact-company]", contact.dataset.company);
-  setAllTextContent("[data-contact-email]", contact.dataset.email);
-
-  sortContactEl(contactId);
+  contacts.set(String(contact.contact_id), contact);
+  list.append(row);
 }
 
-// Delete a contact element from a contact ID
-function deleteContactEl(contactId) {
-  contactsTbody.querySelector(`[data-contact-id="${contactId}"]`).remove();
-}
-
-// Delete all contact elements
-function deleteContactEls() {
-  contactsTbody.replaceChildren();
-}
-
-// -- Search -------------------------------------------------------------------
-
-const searchForm = document.querySelector("[data-search-form]");
-
-async function handleSearch(clearPreviousContacts) {
-  if (progress.searching) return;
-  progress.searching = true;
-
-  const fields = new FormData(searchForm);
-
-  // Get url with potential queries
-  let url = new URL("/api/contacts", window.location.origin);
-
-  const query = fields.get("search-query");
-  if (query) {
-    url.searchParams.set("query", query);
+async function loadContacts(append = false) {
+  if (append && loading) return;
+  clearTimeout(debounce);
+  const currentGeneration = ++generation;
+  const query = search.value;
+  const params = new URLSearchParams({ query, limit });
+  if (append && afterId !== null) params.set("after_id", afterId);
+  loading = true;
+  if (!append) {
+    afterId = null;
+    loadMore.hidden = true;
   }
-
-  // Only use after_id if we're doing a scroll-based search
-  if (!clearPreviousContacts) {
-    const afterId = contactsTbody.lastElementChild?.dataset.contactId;
-    if (afterId) {
-      url.searchParams.set("after_id", afterId);
-    }
-  }
-
-  url = url.pathname + url.search;
+  loadMore.disabled = true;
+  results.setAttribute("aria-busy", "true");
+  status.textContent = append
+    ? "Loading more contacts..."
+    : "Loading contacts...";
+  listError.hidden = true;
 
   try {
-    const data = await requestJson(url, {
-      method: "GET",
-    });
-
-    if (clearPreviousContacts) {
-      deleteContactEls();
+    const data = await request(`/api/contacts?${params}`);
+    // A newer query or mutation supersedes this response, even during debounce.
+    if (currentGeneration !== generation) return;
+    const focus = document.activeElement;
+    const focusedId = focus?.dataset.contactId;
+    const focusedAction = focus?.hasAttribute("data-edit") ? "edit" : "delete";
+    const restoreFocus =
+      list.contains(focus) ||
+      focus === loadMore ||
+      !!focus?.closest("[data-empty]");
+    if (!append) {
+      contacts.clear();
+      list.replaceChildren();
     }
-    createContactEls(data.contacts);
+    data.contacts.forEach(renderContact);
+    afterId = data.contacts.at(-1)?.contact_id ?? afterId;
+    loadMore.hidden = data.contacts.length < limit;
+    loadMore.disabled = false;
+    document.querySelector("[data-contact-list]").hidden = contacts.size === 0;
+    document.querySelector("[data-empty]").hidden =
+      contacts.size !== 0 || query !== "";
+    document.querySelector("[data-no-results]").hidden =
+      contacts.size !== 0 || query === "";
+    document.querySelector("[data-no-results-message]").textContent =
+      `No contacts found for "${query}".`;
+    status.textContent = `${contacts.size} ${contacts.size === 1 ? "contact" : "contacts"} shown${query ? ` for "${query}"` : ""}.`;
+    if (restoreFocus) {
+      const replacement = [
+        ...list.querySelectorAll(`[data-${focusedAction}]`),
+      ].find((button) => button.dataset.contactId === focusedId);
+      (replacement || (!loadMore.hidden ? loadMore : search)).focus();
+    }
   } catch (failure) {
-    console.log(failure);
+    if (currentGeneration !== generation) return;
+    retryAppend = append;
+    listError.hidden = false;
+    document.querySelector("[data-list-error-message]").textContent =
+      failure.message;
+    status.textContent = contacts.size
+      ? "Could not refresh. Previously loaded contacts are still shown."
+      : "Could not load contacts.";
+  } finally {
+    if (currentGeneration === generation) {
+      loading = false;
+      loadMore.disabled = false;
+      results.setAttribute("aria-busy", "false");
+      document.querySelector("[data-skeleton]").hidden = true;
+    }
   }
-
-  progress.searching = false;
 }
 
-// Perform an initial full search on page load, then connect main search event
-await handleSearch(false);
-searchForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await handleSearch(true);
+search.addEventListener("input", () => {
+  clearTimeout(debounce);
+  ++generation;
+  afterId = null;
+  loading = true;
+  loadMore.hidden = true;
+  results.setAttribute("aria-busy", "true");
+  status.textContent = "Waiting to search...";
+  debounce = setTimeout(() => loadContacts(), 300);
 });
+loadMore.addEventListener("click", () => loadContacts(true));
+document
+  .querySelector("[data-retry]")
+  .addEventListener("click", () => loadContacts(retryAppend));
 
-// Load more contacts only if the bottom of the page is detected
-async function ensureNewContactsLoaded() {
-  const scrolledTo = Math.ceil(window.innerHeight + window.scrollY);
-  const bottomPosition = document.documentElement.scrollHeight;
-
-  if (scrolledTo >= bottomPosition - 96) { // Add a 1 inch buffer
-    await handleSearch(false);
+function openContact(contact = null) {
+  editingId = contact?.contact_id ?? null;
+  contactForm.reset();
+  contactForm.querySelector("[data-form-error]").textContent = "";
+  document.querySelector("#contact-form-title").textContent = contact
+    ? "Edit contact"
+    : "Add contact";
+  for (const input of contactForm.querySelectorAll("input")) {
+    input.value = contact?.[input.name] ?? "";
+    input.setCustomValidity("");
   }
+  contactDialog.showModal();
+  contactForm.elements.first_name.focus();
 }
-// Scroll event can trigger this check. Delete event also triggers it later on
-window.addEventListener("scroll", ensureNewContactsLoaded);
 
-// -- Input Pane ---------------------------------------------------------------
-
-const inputPane = document.querySelector("[data-input-pane]");
-const inputForm = document.querySelector("[data-input-form]");
-let inputMode = null; // "create" || "update"
-let currentUpdateContactId = null;
-const inputPaneSubmitButton = inputPane.querySelector('button[type="submit"]');
-const inputPaneCancelButton = inputPane.querySelector('button[type="button"]');
-
-inputForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  const fields = new FormData(inputForm);
-
-  const contactData = {
-    first_name: fields.get("input-first-name"),
-    last_name: fields.get("input-last-name"),
-    phone_number: fields.get("input-phone-number"),
-    company: fields.get("input-company"),
-    email: fields.get("input-email"),
-  }
-
-  if (inputMode === "create") {
-    await handleCreate(contactData);
-  } else if (inputMode === "update") {
-    await handleUpdate(contactData);
+document.querySelectorAll("[data-add]").forEach((button) => {
+  button.addEventListener("click", () => openContact());
+});
+list.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-contact-id]");
+  if (!button) return;
+  const contact = contacts.get(button.dataset.contactId);
+  if (button.hasAttribute("data-edit")) {
+    openContact(contact);
+  } else {
+    deletingId = contact.contact_id;
+    deleteForm.querySelector("[data-form-error]").textContent = "";
+    deleteForm.querySelector("[data-delete-name]").textContent =
+      `${contact.first_name} ${contact.last_name}`;
+    deleteDialog.showModal();
   }
 });
 
-function handleCreatePaneOpen() {
-  handleInputPaneClose(); // Close it first to reset inputs
-  inputMode = "create";
-  inputPaneSubmitButton.innerText = "Create";
-  inputPane.hidden = false;
-}
-function handleUpdatePaneOpen(contactId) {
-  const contact = getContactEl(contactId);
-
-  // Populate pre-existing values
-  document.getElementById("input-first-name").value = contact.dataset.firstName;
-  document.getElementById("input-last-name").value = contact.dataset.lastName;
-  document.getElementById("input-phone-number").value = contact.dataset.phoneNumber;
-  document.getElementById("input-company").value = contact.dataset.company;
-  document.getElementById("input-email").value = contact.dataset.email;
-
-  inputMode = "update";
-  inputPaneSubmitButton.innerText = "Save";
-  currentUpdateContactId = contactId;
-  inputPane.hidden = false;
+// Native dialogs provide modal focus containment and restore their opener.
+// Keep them open (including on Escape) while a mutation is in flight.
+for (const dialog of [contactDialog, deleteDialog]) {
+  dialog.querySelectorAll("[data-close]").forEach((button) => {
+    button.addEventListener("click", () => dialog.close());
+  });
+  dialog.addEventListener("cancel", (event) => {
+    if (dialog.getAttribute("aria-busy") === "true") event.preventDefault();
+  });
 }
 
-function handleInputPaneClose() {
-  inputPane.hidden = true;
-  document.getElementById("input-first-name").value = "";
-  document.getElementById("input-last-name").value = "";
-  document.getElementById("input-phone-number").value = "";
-  document.getElementById("input-company").value = "";
-  document.getElementById("input-email").value = "";
+for (const input of contactForm.querySelectorAll("input")) {
+  input.addEventListener("input", () => input.setCustomValidity(""));
 }
 
-inputPaneCancelButton.addEventListener("click", handleInputPaneClose);
-
-// -- Create -------------------------------------------------------------------
-
-const createButton = document.querySelector("[data-create-button]");
-createButton.addEventListener("click", handleCreatePaneOpen);
-
-async function handleCreate(inputData) {
-  if (progress.creating) return;
-  progress.creating = true;
-
-  try {
-    const responseData = await requestJson("/api/contacts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(inputData),
-    });
-
-    handleInputPaneClose(); // Only hide pane if create successful
-    inputData.contact_id = responseData.contact_id;
-    createContactEl(inputData);
-  } catch (failure) {
-    console.log(failure);
+function contactData() {
+  const data = {};
+  for (const input of contactForm.querySelectorAll("input")) {
+    const value = input.value.trim();
+    const bytes = new TextEncoder().encode(value).length;
+    input.setCustomValidity(
+      input.required && !value
+        ? "Enter a value, not just spaces."
+        : bytes > input.maxLength
+          ? `Use no more than ${input.maxLength} bytes (some characters use more than one).`
+          : "",
+    );
+    data[input.name] = value || null;
   }
-
-  progress.creating = false;
+  return contactForm.reportValidity() ? data : null;
 }
 
-// -- Update -------------------------------------------------------------------
-
-async function handleUpdate(newContactData) {
-  if (progress.updating) return;
-  progress.updating = true;
-
+async function mutate(dialog, url, method, data) {
+  if (dialog.getAttribute("aria-busy") === "true") return;
+  const controls = dialog.querySelectorAll("button, input");
+  const submit = dialog.querySelector('[type="submit"]');
+  const label = submit.textContent;
+  const error = dialog.querySelector("[data-form-error]");
+  dialog.setAttribute("aria-busy", "true");
+  controls.forEach((control) => (control.disabled = true));
+  submit.textContent = method === "DELETE" ? "Deleting..." : "Saving...";
+  error.textContent = "";
   try {
-    await requestJson(`/api/contacts/${currentUpdateContactId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newContactData),
+    await request(url, {
+      method,
+      ...(data
+        ? {
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          }
+        : {}),
     });
-
-    handleInputPaneClose(); // Only hide pane if update successful
-
-    const contact = getContactEl(currentUpdateContactId);
-    contact.dataset.firstName = newContactData.first_name;
-    contact.dataset.lastName = newContactData.last_name;
-    contact.dataset.phoneNumber = newContactData.phone_number;
-    contact.dataset.company = newContactData.company ?? "";
-    contact.dataset.email = newContactData.email ?? "";
-    updateContactEl(currentUpdateContactId);
+    dialog.close();
+    afterId = null;
+    loadContacts();
   } catch (failure) {
-    console.log(failure);
+    error.textContent = failure.message;
+  } finally {
+    dialog.setAttribute("aria-busy", "false");
+    controls.forEach((control) => (control.disabled = false));
+    submit.textContent = label;
+    if (dialog.open) submit.focus();
   }
-
-  progress.updating = false;
 }
+contactForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (contactDialog.getAttribute("aria-busy") === "true") return;
+  const data = contactData();
+  if (data)
+    mutate(
+      contactDialog,
+      editingId === null ? "/api/contacts" : `/api/contacts/${editingId}`,
+      editingId === null ? "POST" : "PATCH",
+      data,
+    );
+});
+deleteForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  mutate(deleteDialog, `/api/contacts/${deletingId}`, "DELETE");
+});
 
-// -- Delete -------------------------------------------------------------------
-
-async function handleDelete(contactId) {
-  if (progress.deleting) return;
-  progress.deleting = true;
-
+const logout = document.querySelector("[data-logout]");
+logout.addEventListener("click", async () => {
+  if (logout.disabled) return;
+  logout.disabled = true;
+  logout.textContent = "Logging out...";
   try {
-    await requestJson(`/api/contacts/${contactId}`, {
-      method: "DELETE",
-    });
-
-    deleteContactEl(contactId);
-
-    // Delete can bring the bottom of the page into view, so ensure new contacts are loaded
-    await ensureNewContactsLoaded();
+    await request("/api/auth/logout", { method: "POST" });
+    window.location.assign("/login");
   } catch (failure) {
-    console.log(failure);
+    document.querySelector("[data-logout-error]").textContent = failure.message;
+    logout.disabled = false;
+    logout.textContent = "Log out";
   }
+});
 
-  progress.deleting = false;
-}
+loadContacts();
