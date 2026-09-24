@@ -8,7 +8,7 @@
   </head>
   <body class="bg-white text-zinc-950">
     {% block header %}{% endblock %}
-    <main class="mx-auto max-w-3xl p-6">
+    <main class="{% block main_class %}mx-auto max-w-3xl p-6{% endblock %}">
       {% block content %}{% endblock %}
     </main>
     {% block scripts %}{% endblock %}
