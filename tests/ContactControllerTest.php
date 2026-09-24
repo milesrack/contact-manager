@@ -222,12 +222,56 @@ final class ContactControllerTest extends TestCase
             unset($missing[$field]);
             yield 'missing ' . $field => [$missing];
             yield 'empty ' . $field => [array_replace($valid, [$field => ''])];
+            yield 'whitespace ' . $field => [array_replace($valid, [$field => " \t\n\u{00A0}\u{2003}\u{FEFF}"])];
         }
         foreach (['first_name' => 255, 'last_name' => 255, 'phone_number' => 20, 'company' => 255, 'email' => 255] as $field => $limit) {
             yield 'invalid type for ' . $field => [array_replace($valid, [$field => 123])];
             yield 'too long ' . $field => [array_replace($valid, [$field => str_repeat('A', $limit + 1)])];
+            yield 'too many UTF-8 bytes ' . $field => [array_replace($valid, [$field => str_repeat('é', intdiv($limit, 2) + 1)])];
         }
+        foreach (['not-an-email', 'ada@', 'ada@example', 'ada lovelace@example.com', "ada@example.com\nBcc: other@example.com", 'ada@例え.テスト'] as $email) {
+            yield 'invalid email ' . $email => [$valid + ['email' => $email]];
+        }
+        yield 'invalid UTF-8' => [array_replace($valid, ['first_name' => "\xFF"])];
         yield 'extra field' => [$valid + ['extra' => 'invalid']];
+    }
+
+    /** @param array<string, string|null> $data */
+    #[DataProvider('normalisedContactData')]
+    public function testCreateAndUpdateStoreNormalisedValues(array $data): void
+    {
+        $padded = array_map(static fn(?string $value): string => "\u{00A0} \t" . ($value ?? '') . "\n\u{2003}\u{FEFF}", $data);
+        $created = $this->controller->create($this->userId, $padded);
+        self::assertSame(201, $created['status']);
+        $contactId = $created['data']['contact_id'];
+        self::assertSame(['contact_id' => $contactId] + $data, $this->controller->search($this->userId, '')['data']['contacts'][0]);
+
+        $this->controller->update($this->userId, $contactId, [
+            'first_name' => 'Before', 'last_name' => 'Edit', 'phone_number' => '123',
+            'company' => 'Before', 'email' => 'before@example.com',
+        ]);
+        $updated = $this->controller->update($this->userId, $contactId, $padded);
+        self::assertSame(200, $updated['status']);
+        self::assertSame(['contact_id' => $contactId] + $data, $this->controller->search($this->userId, '')['data']['contacts'][0]);
+    }
+
+    /** @return iterable<string, array{array<string, string|null>}> */
+    public static function normalisedContactData(): iterable
+    {
+        yield 'Unicode names and formatted phone' => [[
+            'first_name' => 'Zoë', 'last_name' => '李', 'company' => 'Société',
+            'email' => 'Zoe+work@Example.com', 'phone_number' => '+44 (20) 1234-5678',
+        ]];
+        yield 'blank optional fields' => [[
+            'first_name' => 'Ada', 'last_name' => 'Lovelace', 'company' => null,
+            'email' => null, 'phone_number' => '123-456-7890',
+        ]];
+        yield 'byte boundaries' => [[
+            'first_name' => str_repeat('é', 127) . 'a', 'last_name' => str_repeat('a', 255),
+            'company' => str_repeat('é', 127) . 'a',
+            'email' => str_repeat('a', 64) . '@' . str_repeat('b', 63) . '.' . str_repeat('c', 63) . '.' . str_repeat('d', 61),
+            'phone_number' => str_repeat('1', 20),
+        ]];
     }
 
     public function testCreateSucceedsWithRequiredFieldsOnly(): void
