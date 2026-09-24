@@ -236,42 +236,52 @@ final class ContactControllerTest extends TestCase
         yield 'extra field' => [$valid + ['extra' => 'invalid']];
     }
 
-    /** @param array<string, string|null> $data */
+    /**
+     * @param array<string, string|null> $expected
+     * @param array<string, string|null> $input
+     */
     #[DataProvider('normalisedContactData')]
-    public function testCreateAndUpdateStoreNormalisedValues(array $data): void
+    public function testCreateAndUpdateStoreNormalisedValues(array $expected, array $input): void
     {
-        $padded = array_map(static fn(?string $value): string => "\u{00A0} \t" . ($value ?? '') . "\n\u{2003}\u{FEFF}", $data);
-        $created = $this->controller->create($this->userId, $padded);
+        $created = $this->controller->create($this->userId, $input);
         self::assertSame(201, $created['status']);
         $contactId = $created['data']['contact_id'];
-        self::assertSame(['contact_id' => $contactId] + $data, $this->controller->search($this->userId, '')['data']['contacts'][0]);
+        self::assertSame(['contact_id' => $contactId] + $expected, $this->controller->search($this->userId, '')['data']['contacts'][0]);
 
         $this->controller->update($this->userId, $contactId, [
             'first_name' => 'Before', 'last_name' => 'Edit', 'phone_number' => '123',
             'company' => 'Before', 'email' => 'before@example.com',
         ]);
-        $updated = $this->controller->update($this->userId, $contactId, $padded);
+        $updated = $this->controller->update($this->userId, $contactId, $input);
         self::assertSame(200, $updated['status']);
-        self::assertSame(['contact_id' => $contactId] + $data, $this->controller->search($this->userId, '')['data']['contacts'][0]);
+        self::assertSame(['contact_id' => $contactId] + $expected, $this->controller->search($this->userId, '')['data']['contacts'][0]);
     }
 
-    /** @return iterable<string, array{array<string, string|null>}> */
+    /** @return iterable<string, array{array<string, string|null>, array<string, string|null>}> */
     public static function normalisedContactData(): iterable
     {
-        yield 'Unicode names and formatted phone' => [[
-            'first_name' => 'Zoë', 'last_name' => '李', 'company' => 'Société',
-            'email' => 'Zoe+work@Example.com', 'phone_number' => '+44 (20) 1234-5678',
-        ]];
-        yield 'blank optional fields' => [[
+        $blank = [
             'first_name' => 'Ada', 'last_name' => 'Lovelace', 'company' => null,
             'email' => null, 'phone_number' => '123-456-7890',
-        ]];
-        yield 'byte boundaries' => [[
-            'first_name' => str_repeat('é', 127) . 'a', 'last_name' => str_repeat('a', 255),
-            'company' => str_repeat('é', 127) . 'a',
-            'email' => str_repeat('a', 64) . '@' . str_repeat('b', 63) . '.' . str_repeat('c', 63) . '.' . str_repeat('d', 61),
-            'phone_number' => str_repeat('1', 20),
-        ]];
+        ];
+        foreach ([
+            'Unicode names and formatted phone' => [
+                'first_name' => 'Zoë', 'last_name' => '李', 'company' => 'Société',
+                'email' => 'Zoe+work@Example.com', 'phone_number' => '+44 (20) 1234-5678',
+            ],
+            'whitespace optional fields' => $blank,
+            'byte boundaries' => [
+                'first_name' => str_repeat('é', 127) . 'a', 'last_name' => str_repeat('a', 255),
+                'company' => str_repeat('é', 127) . 'a',
+                'email' => str_repeat('a', 64) . '@' . str_repeat('b', 63) . '.' . str_repeat('c', 63) . '.' . str_repeat('d', 61),
+                'phone_number' => str_repeat('1', 20),
+            ],
+        ] as $name => $expected) {
+            yield $name => [$expected, array_map(static fn(?string $value): string => "\u{00A0} \t" . ($value ?? '') . "\n\u{2003}\u{FEFF}", $expected)];
+        }
+        yield 'null optional fields' => [$blank, $blank];
+        yield 'empty optional fields' => [$blank, array_replace($blank, ['company' => '', 'email' => ''])];
+        yield 'omitted optional fields' => [$blank, array_diff_key($blank, ['company' => true, 'email' => true])];
     }
 
     public function testCreateSucceedsWithRequiredFieldsOnly(): void
@@ -300,54 +310,6 @@ final class ContactControllerTest extends TestCase
         self::assertSame(201, $result['status']);
         self::assertArrayHasKey('contact_id', $result['data']);
         self::assertGreaterThan(0, $result['data']['contact_id']);
-    }
-
-    public function testCreateConvertsEmptyCompanyToNull(): void
-    {
-        $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'company' => '',
-        ]);
-        $result = $this->controller->search($this->userId, 'John', 1);
-
-        self::assertSame(200, $result['status']);
-        self::assertNull($result['data']['contacts'][0]['company']);
-    }
-
-    public function testCreateConvertsEmptyEmailToNull(): void
-    {
-        $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'email' => '',
-        ]);
-        $result = $this->controller->search($this->userId, 'John', 1);
-
-        self::assertSame(200, $result['status']);
-        self::assertNull($result['data']['contacts'][0]['email']);
-    }
-
-    public function testCreateAcceptsExplicitNullOptionalFields(): void
-    {
-        $result = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'company' => null,
-            'email' => null,
-        ]);
-
-        self::assertSame(201, $result['status']);
-
-        $searchResult = $this->controller->search($this->userId, 'John', 1);
-
-        self::assertSame(200, $searchResult['status']);
-        self::assertSame('John', $searchResult['data']['contacts'][0]['first_name']);
-        self::assertNull($searchResult['data']['contacts'][0]['company']);
-        self::assertNull($searchResult['data']['contacts'][0]['email']);
     }
 
     /*
@@ -404,47 +366,6 @@ final class ContactControllerTest extends TestCase
         self::assertTrue($result['data']['success']);
     }
 
-    public function testUpdateConvertsEmptyCompanyToNull(): void
-    {
-        $contactId = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'company' => 'Google',
-        ])['data']['contact_id'];
-        $this->controller->update($this->userId, $contactId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'company' => '',
-        ]);
-        $result = $this->controller->search($this->userId, 'John', 1);
-
-        self::assertSame(200, $result['status']);
-        self::assertNull($result['data']['contacts'][0]['company']);
-    }
-
-    public function testUpdateConvertsEmptyEmailToNull(): void
-    {
-        $contactId = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'company' => 'Google',
-            'email' => 'john@example.com',
-        ])['data']['contact_id'];
-        $this->controller->update($this->userId, $contactId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'email' => '',
-        ]);
-        $result = $this->controller->search($this->userId, 'John', 1);
-
-        self::assertSame(200, $result['status']);
-        self::assertNull($result['data']['contacts'][0]['email']);
-    }
-
     public function testUpdateReturnsNotFoundForNonexistentContact(): void
     {
         $result = $this->controller->update($this->userId, PHP_INT_MAX, [
@@ -458,65 +379,6 @@ final class ContactControllerTest extends TestCase
             'Contact not found',
             $result['data']['error'],
         );
-    }
-
-    public function testUpdateConvertsEmptyOptionalFieldsToNull(): void
-    {
-        $createResult = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-        ]);
-
-        self::assertSame(201, $createResult['status']);
-
-        $contactId = $createResult['data']['contact_id'];
-
-        $result = $this->controller->update($this->userId, $contactId, [
-            'first_name' => 'Jane',
-            'last_name' => 'Doe',
-            'phone_number' => '9876543210',
-            'company' => '',
-            'email' => '',
-        ]);
-
-        self::assertSame(200, $result['status']);
-        self::assertTrue($result['data']['success']);
-
-        $result = $this->controller->search($this->userId, 'Jane', 1);
-
-        self::assertNull($result['data']['contacts'][0]['company']);
-        self::assertNull($result['data']['contacts'][0]['email']);
-    }
-
-    public function testUpdateAcceptsExplicitNullOptionalFields(): void
-    {
-        $createResult = $this->controller->create($this->userId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'company' => 'Example Company',
-            'email' => 'john@example.com',
-        ]);
-
-        self::assertSame(201, $createResult['status']);
-
-        $contactId = $createResult['data']['contact_id'];
-        $result = $this->controller->update($this->userId, $contactId, [
-            'first_name' => 'John',
-            'last_name' => 'Smith',
-            'phone_number' => '1234567890',
-            'company' => null,
-            'email' => null,
-        ]);
-
-        self::assertSame(200, $result['status']);
-        self::assertTrue($result['data']['success']);
-
-        $searchResult = $this->controller->search($this->userId, 'John', 1);
-
-        self::assertNull($searchResult['data']['contacts'][0]['company']);
-        self::assertNull($searchResult['data']['contacts'][0]['email']);
     }
 
     /*
