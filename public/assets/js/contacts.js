@@ -11,7 +11,9 @@ const contactDialog = document.querySelector("[data-contact-dialog]");
 const contactForm = document.querySelector("[data-contact-form]");
 const deleteDialog = document.querySelector("[data-delete-dialog]");
 const deleteForm = document.querySelector("[data-delete-form]");
+const discardDialog = document.querySelector("[data-discard-dialog]");
 const contacts = new Map();
+let originalFields = "";
 const limit = 50;
 let afterId = null;
 let generation = 0;
@@ -146,8 +148,9 @@ function openContact(contact = null) {
     : "Add contact";
   for (const input of contactForm.querySelectorAll("input")) {
     input.value = contact?.[input.name] ?? "";
-    input.setCustomValidity("");
+    clearFieldError(input);
   }
+  originalFields = fieldSnapshot();
   contactDialog.showModal();
   contactForm.elements.first_name.focus();
 }
@@ -170,36 +173,127 @@ list.addEventListener("click", (event) => {
   }
 });
 
-// Native dialogs provide modal focus containment and restore their opener.
-// Keep them open (including on Escape) while a mutation is in flight.
+// Native dialogs contain focus and restore their opener. Every dismissal of
+// the sheet follows the same unsaved-changes and pending-request checks.
+function requestClose(dialog) {
+  if (dialog.getAttribute("aria-busy") === "true") return;
+  if (dialog === contactDialog && fieldSnapshot() !== originalFields) {
+    if (!discardDialog.open) discardDialog.showModal();
+    return;
+  }
+  dialog.close();
+}
+
 for (const dialog of [contactDialog, deleteDialog]) {
   dialog.querySelectorAll("[data-close]").forEach((button) => {
-    button.addEventListener("click", () => dialog.close());
+    button.addEventListener("click", () => requestClose(dialog));
   });
   dialog.addEventListener("cancel", (event) => {
-    if (dialog.getAttribute("aria-busy") === "true") event.preventDefault();
+    event.preventDefault();
+    requestClose(dialog);
   });
 }
 
+discardDialog
+  .querySelector("[data-keep-editing]")
+  .addEventListener("click", () => discardDialog.close());
+discardDialog.querySelector("[data-discard]").addEventListener("click", () => {
+  discardDialog.close();
+  contactDialog.close();
+});
+
+function outsideSheet(event) {
+  const bounds = contactDialog.getBoundingClientRect();
+  return (
+    event.target === contactDialog &&
+    (event.clientX < bounds.left ||
+      event.clientX > bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY > bounds.bottom)
+  );
+}
+let pointerStartedOutside = false;
+contactDialog.addEventListener("pointerdown", (event) => {
+  pointerStartedOutside = outsideSheet(event);
+});
+contactDialog.addEventListener("click", (event) => {
+  if (pointerStartedOutside && outsideSheet(event)) requestClose(contactDialog);
+  pointerStartedOutside = false;
+});
+
+// Tooltips are visible on hover and keyboard focus, and dismissible with Escape.
+list.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    list
+      .querySelectorAll("[data-action-tooltip]")
+      .forEach((tooltip) => (tooltip.hidden = true));
+  }
+});
+for (const eventName of ["pointerover", "focusin"]) {
+  list.addEventListener(eventName, (event) => {
+    const button = event.target.closest("button[data-contact-id]");
+    if (button)
+      button.parentElement.querySelector("[data-action-tooltip]").hidden =
+        false;
+  });
+}
+
+function fieldSnapshot() {
+  return JSON.stringify(
+    [...contactForm.querySelectorAll("input")].map((input) =>
+      input.value.trim(),
+    ),
+  );
+}
+
+function clearFieldError(input) {
+  input.setCustomValidity("");
+  input.removeAttribute("aria-invalid");
+  document.getElementById(`${input.id}-error`).textContent = "";
+}
+
+function validateField(input) {
+  clearFieldError(input);
+  const value = input.value.trim();
+  let error = "";
+  if (input.required && !value) {
+    const labels = {
+      first_name: "First name",
+      last_name: "Last name",
+      phone_number: "Phone",
+    };
+    error = `${labels[input.name]} is required.`;
+  } else if (input.name === "email") {
+    input.value = value;
+    if (input.validity.typeMismatch)
+      error = "Enter an email address such as name@example.com.";
+  }
+  if (
+    !error &&
+    new TextEncoder().encode(value).length > Number(input.dataset.byteLimit)
+  ) {
+    error = `Use no more than ${input.dataset.byteLimit} bytes (some characters use more than one).`;
+  }
+  input.setCustomValidity(error);
+  if (error) input.setAttribute("aria-invalid", "true");
+  document.getElementById(`${input.id}-error`).textContent = error;
+  return value || null;
+}
+
 for (const input of contactForm.querySelectorAll("input")) {
-  input.addEventListener("input", () => input.setCustomValidity(""));
+  input.addEventListener("input", () => clearFieldError(input));
+  input.addEventListener("blur", () => validateField(input));
 }
 
 function contactData() {
   const data = {};
+  let firstInvalid = null;
   for (const input of contactForm.querySelectorAll("input")) {
-    const value = input.value.trim();
-    const bytes = new TextEncoder().encode(value).length;
-    input.setCustomValidity(
-      input.required && !value
-        ? "Enter a value, not just spaces."
-        : bytes > input.maxLength
-          ? `Use no more than ${input.maxLength} bytes (some characters use more than one).`
-          : "",
-    );
-    data[input.name] = value || null;
+    data[input.name] = validateField(input);
+    if (!input.validity.valid && !firstInvalid) firstInvalid = input;
   }
-  return contactForm.reportValidity() ? data : null;
+  if (firstInvalid) firstInvalid.focus();
+  return firstInvalid ? null : data;
 }
 
 async function mutate(dialog, url, method, data) {

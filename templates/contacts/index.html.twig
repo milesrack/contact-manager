@@ -36,7 +36,7 @@
       </div>
       <div data-contact-list hidden class="overflow-hidden rounded-xl border border-zinc-200">
         <div aria-hidden="true" class="hidden grid-cols-[1.3fr_1fr_1.5fr_1fr_auto] gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-medium text-zinc-500 md:grid">
-          <span>Name</span><span>Company</span><span>Email</span><span>Phone</span><span class="w-28">Actions</span>
+          <span>Name</span><span>Company</span><span>Email</span><span>Phone</span><span class="w-20">Actions</span>
         </div>
         <ul data-contacts aria-label="Contacts" class="divide-y divide-zinc-200"></ul>
       </div>
@@ -57,6 +57,7 @@
   {% include "components/contact-card.html.twig" %}
   {% include "components/contact-form.html.twig" %}
   {% include "components/delete-modal.html.twig" %}
+  {% include "components/discard-modal.html.twig" %}
 {% endblock %}
 
 {% block scripts %}<script type="module" src="/assets/js/contacts.js"></script>{% endblock %}

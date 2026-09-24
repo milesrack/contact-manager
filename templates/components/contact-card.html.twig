@@ -5,8 +5,16 @@
     <p class="mt-2 min-w-0 break-words text-zinc-600 md:mt-0 md:block"><span class="sr-only">Email: </span><span data-email></span></p>
     <p class="min-w-0 break-words text-zinc-600"><span class="sr-only">Phone: </span><span data-phone></span></p>
     <div class="-ml-3 mt-2 flex md:ml-0 md:mt-0">
-      <button type="button" data-edit class="btn-text">Edit</button>
-      <button type="button" data-delete class="btn-text text-red-700 hover:bg-red-50 hover:text-red-800 active:bg-red-100">Delete</button>
+      {% for action in ['edit', 'delete'] %}
+        <div class="group relative">
+          <button type="button" data-{{ action }} aria-label="{{ action|capitalize }} contact" class="btn-text size-10 px-0{% if action == 'delete' %} text-red-700 hover:bg-red-50 hover:text-red-800 active:bg-red-100{% endif %}">
+            <svg aria-hidden="true" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              {% if action == 'edit' %}<path d="m16 3 5 5M4 15 16 3a3.5 3.5 0 0 1 5 5L9 20l-6 1 1-6Z" />{% else %}<path d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M5 6l1 14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-14M10 10v7M14 10v7" />{% endif %}
+            </svg>
+          </button>
+          <span data-action-tooltip aria-hidden="true" class="invisible absolute bottom-full left-1/2 z-10 -translate-x-1/2 rounded bg-zinc-950 px-2 py-1 text-xs text-white group-focus-within:visible group-hover:visible">{{ action|capitalize }}</span>
+        </div>
+      {% endfor %}
     </div>
   </li>
 </template>
