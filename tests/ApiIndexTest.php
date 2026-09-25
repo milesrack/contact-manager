@@ -451,7 +451,6 @@ final class ApiIndexTest extends TestCase
         $account = $this->users->findByEmail($email);
         self::assertNotNull($account);
         self::assertTrue(password_verify($credentials['password'], $account['password_hash']));
-        self::assertStringContainsString('Account created. Log in to continue.', (string) $client->get('/login')->getBody());
         self::assertStringNotContainsString('Account created. Log in to continue.', (string) $client->get('/login')->getBody());
         self::assertSame(401, $client->get('/api/contacts')->getStatusCode());
         $oldSession = $this->sessionId($cookies);

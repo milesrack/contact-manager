@@ -53,11 +53,6 @@ if ($path === '/') {
 }
 
 header('Content-Type: text/html; charset=utf-8');
-$registrationComplete = $path === '/login' && ($_SESSION['registration_complete'] ?? false) === true;
-if ($path === '/login') {
-    unset($_SESSION['registration_complete']);
-}
 echo $twig->render($template, [
     'password_min_length' => App\AuthController::MIN_PASSWORD_LENGTH,
-    'registration_complete' => $registrationComplete,
 ]);
