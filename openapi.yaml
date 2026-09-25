@@ -8,7 +8,7 @@ info:
 paths:
   /api/auth/register:
     post:
-      summary: Create an account without logging in
+      summary: Register an account
       requestBody:
         required: true
         content:
@@ -32,7 +32,7 @@ paths:
 
   /api/auth/login:
     post:
-      summary: Log in and regenerate the session ID
+      summary: Log in
       requestBody:
         required: true
         content:
@@ -64,7 +64,7 @@ paths:
 
   /api/auth/logout:
     post:
-      summary: Destroy the session and expire its cookie
+      summary: Log out
       responses:
         "200":
           $ref: "#/components/responses/AuthLogoutResponse"
@@ -200,10 +200,10 @@ paths:
 components:
   responses:
     AuthUserResponse:
-      description: Account created or login successful. Only login authenticates the session.
+      description: Account registered or user logged in. Registration does not start an authenticated session.
       headers:
         Set-Cookie:
-          description: PHPSESSID session cookie; login replaces the previous session ID.
+          description: New PHPSESSID on login.
           schema:
             type: string
       content:
@@ -218,7 +218,7 @@ components:
             user_id: 123
 
     AuthLogoutResponse:
-      description: Session destroyed. Also succeeds when already logged out.
+      description: Logged out; succeeds even without an authenticated session.
       headers:
         Set-Cookie:
           description: Expires the PHPSESSID cookie.
@@ -264,7 +264,7 @@ components:
             error: "Unsupported HTTP method"
 
     ContactSearchResponse:
-      description: Successful contact search
+      description: Matching contacts
       content:
         application/json:
           schema:
@@ -286,7 +286,7 @@ components:
                 phone_number: "555-123-4567"
 
     ContactCreateResponse:
-      description: Contact created successfully
+      description: Contact created
       content:
         application/json:
           schema:
@@ -300,7 +300,7 @@ components:
             contact_id: 123
 
     ContactSuccessResponse:
-      description: Contact operation completed successfully
+      description: Contact updated or deleted
       content:
         application/json:
           schema:
@@ -314,7 +314,7 @@ components:
             success: true
 
     BadRequest:
-      description: Bad request
+      description: Invalid request body or URI
       content:
         application/json:
           schema:
@@ -331,7 +331,7 @@ components:
                 error: "Invalid request URI"
 
     BadRequestUri:
-      description: Bad request
+      description: Invalid request URI
       content:
         application/json:
           schema:
@@ -393,13 +393,19 @@ components:
       properties:
         email:
           type: string
-          description: Surrounding Unicode whitespace is trimmed. Must pass PHP FILTER_VALIDATE_EMAIL and be at most 255 bytes. Case is preserved.
+          description: |-
+            - Valid email address.
+            - Maximum 255 bytes after trimming.
+            - Case preserved.
           example: "ada@example.com"
         password:
           type: string
           minLength: 15
           maxLength: 72
-          description: At least 15 Unicode code points and at most 72 UTF-8 bytes. Must contain a non-whitespace character and no NUL bytes. Spaces and Unicode are accepted without composition rules. Passwords are never trimmed or truncated.
+          description: |-
+            - Minimum 15 Unicode code points; maximum 72 UTF-8 bytes.
+            - No whitespace-only values or NUL bytes.
+            - No trimming or truncation.
 
     Credentials:
       type: object
@@ -407,13 +413,16 @@ components:
       properties:
         email:
           type: string
-          description: Surrounding Unicode whitespace is trimmed before looking up the account.
+          description: Email address; surrounding whitespace is trimmed.
           example: "ada@example.com"
         password:
           type: string
           minLength: 1
           maxLength: 72
-          description: Must contain a non-whitespace character, contain no NUL bytes, and be at most 72 bytes for bcrypt. Passwords are not trimmed. The registration minimum does not apply to existing accounts at login.
+          description: |-
+            - Maximum 72 bytes.
+            - No blank values or NUL bytes.
+            - No trimming.
 
     ContactOutput:
       type: object
@@ -443,7 +452,11 @@ components:
 
     ContactInput:
       type: object
-      description: Surrounding whitespace, including Unicode whitespace, is trimmed. Required fields must not be blank; blank optional fields become null. Length limits are enforced in UTF-8 bytes after trimming. PATCH requires all required fields.
+      description: |-
+        - Surrounding Unicode whitespace is trimmed.
+        - Required fields must be present and nonblank for both POST and PATCH.
+        - Blank optional fields become null.
+        - Length limits count UTF-8 bytes after trimming.
       required:
         - first_name
         - last_name
@@ -461,7 +474,7 @@ components:
           type: string
           maxLength: 20
           minLength: 1
-          description: Formatting within the value is preserved; no country-specific validation or reformatting is applied.
+          description: Phone number; formatting is preserved.
         company:
           type: string
           maxLength: 255
@@ -470,7 +483,10 @@ components:
           type: string
           maxLength: 255
           nullable: true
-          description: When supplied and nonblank, must pass PHP FILTER_VALIDATE_EMAIL. Case is preserved. Unicode email addresses are not supported; international domains must use their ASCII (Punycode) form.
+          description: |-
+            - Valid email address or null.
+            - Case preserved.
+            - ASCII only; use Punycode for international domain names.
       example:
         first_name: "Ada"
         last_name: "Lovelace"

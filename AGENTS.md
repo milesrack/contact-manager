@@ -2,8 +2,8 @@
 
 Read and follow:
 
-- `README.md` for project context
-- `CONTRIBUTING.md` for Git, branch, commit, pull request, testing, and code-quality requirements
+- [README.md](README.md) for project context
+- [CONTRIBUTING.md](CONTRIBUTING.md) for Git, branch, commit, pull request, testing, and code-quality requirements
 
 ## Project Requirements
 
