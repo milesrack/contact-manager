@@ -1,0 +1,36 @@
+name: Update Swagger Documentation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - openapi.yaml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swagger-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: Update Swagger
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Update Swagger API
+        env:
+          SWAGGERHUB_API_KEY: ${{ secrets.SWAGGERHUB_API_KEY }}
+        run: |
+          curl --fail-with-body \
+            --url "https://api.swaggerhub.com/apis/poosd-2bf/contact-manager" \
+            --header "Authorization: ${SWAGGERHUB_API_KEY}" \
+            --header "Content-Type: application/yaml" \
+            --data-binary "@openapi.yaml"
