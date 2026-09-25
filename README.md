@@ -224,15 +224,15 @@ MySQL
 
 ### API Endpoints
 
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `POST` | `/api/auth/register` | Create a new user account |
-| `POST` | `/api/auth/login` | Authenticate a user and start a session |
-| `POST` | `/api/auth/logout` | End the current user session |
-| `GET` | `/api/contacts` | Search or retrieve the authenticated user's contacts |
-| `POST` | `/api/contacts` | Create a new contact |
-| `PATCH` | `/api/contacts/{contact_id}` | Update an existing contact |
-| `DELETE` | `/api/contacts/{contact_id}` | Delete an existing contact |
+| Method   | Endpoint                     | Description                                          |
+| -------- | ---------------------------- | ---------------------------------------------------- |
+| `POST`   | `/api/auth/register`         | Create a new user account                            |
+| `POST`   | `/api/auth/login`            | Authenticate a user and start a session              |
+| `POST`   | `/api/auth/logout`           | End the current user session                         |
+| `GET`    | `/api/contacts`              | Search or retrieve the authenticated user's contacts |
+| `POST`   | `/api/contacts`              | Create a new contact                                 |
+| `PATCH`  | `/api/contacts/{contact_id}` | Update an existing contact                           |
+| `DELETE` | `/api/contacts/{contact_id}` | Delete an existing contact                           |
 
 Contact endpoints use the authenticated user's PHP session to ensure users can only access their own contacts. Search supports partial matching across first name, last name, company, email, and phone number, along with configurable result limits and pagination.
 
