@@ -393,19 +393,13 @@ components:
       properties:
         email:
           type: string
-          description: |-
-            - Valid email address.
-            - Maximum 255 bytes after trimming.
-            - Case preserved.
+          description: Valid email address, up to 255 bytes after trimming. Case is preserved.
           example: "ada@example.com"
         password:
           type: string
           minLength: 15
           maxLength: 72
-          description: |-
-            - Minimum 15 Unicode code points; maximum 72 UTF-8 bytes.
-            - No whitespace-only values or NUL bytes.
-            - No trimming or truncation.
+          description: At least 15 Unicode characters and at most 72 UTF-8 bytes. Whitespace-only values and NUL bytes are rejected. Used without trimming or truncation.
 
     Credentials:
       type: object
@@ -419,10 +413,7 @@ components:
           type: string
           minLength: 1
           maxLength: 72
-          description: |-
-            - Maximum 72 bytes.
-            - No blank values or NUL bytes.
-            - No trimming.
+          description: Up to 72 bytes; cannot be blank or contain NUL bytes. Used without trimming.
 
     ContactOutput:
       type: object
@@ -452,11 +443,7 @@ components:
 
     ContactInput:
       type: object
-      description: |-
-        - Surrounding Unicode whitespace is trimmed.
-        - Required fields must be present and nonblank for both POST and PATCH.
-        - Blank optional fields become null.
-        - Length limits count UTF-8 bytes after trimming.
+      description: Values are trimmed; length limits count UTF-8 bytes. Blank optional fields become null. POST and PATCH both require all required fields to be nonblank.
       required:
         - first_name
         - last_name
@@ -483,10 +470,7 @@ components:
           type: string
           maxLength: 255
           nullable: true
-          description: |-
-            - Valid email address or null.
-            - Case preserved.
-            - ASCII only; use Punycode for international domain names.
+          description: Valid ASCII email address or null. Use Punycode for international domains. Case is preserved.
       example:
         first_name: "Ada"
         last_name: "Lovelace"
