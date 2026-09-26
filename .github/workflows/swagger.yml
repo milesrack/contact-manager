@@ -30,7 +30,7 @@ jobs:
           SWAGGERHUB_API_KEY: ${{ secrets.SWAGGERHUB_API_KEY }}
         run: |
           curl --fail-with-body \
-            --url "https://api.swaggerhub.com/apis/poosd-2bf/contact-manager" \
+            --url "https://api.swaggerhub.com/apis/poosd-2bf/contact-manager-api" \
             --header "Authorization: ${SWAGGERHUB_API_KEY}" \
             --header "Content-Type: application/yaml" \
             --data-binary "@openapi.yaml"
