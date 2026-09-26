@@ -5,6 +5,10 @@ info:
   version: 1.0.0
   description: API for managing user contacts.
 
+servers:
+  - url: https://poosd.dev
+    description: Live application
+
 paths:
   /api/auth/register:
     post:
