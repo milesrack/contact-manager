@@ -4,7 +4,7 @@ A personal contact manager web application built using the LAMP stack.
 
 ## Live Links
 
-- **Live application**: [https://poosd.dev](https://poosd.dev)
+- **Live application**: [https://contact-manager.poosd.dev](https://contact-manager.poosd.dev)
 - **SwaggerHub API Documentation:** [https://app.swaggerhub.com/apis-docs/poosd-2bf/contact-manager-api](https://app.swaggerhub.com/apis-docs/poosd-2bf/contact-manager-api)
 
 ## Features
