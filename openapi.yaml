@@ -6,7 +6,7 @@ info:
   description: API for managing user contacts.
 
 servers:
-  - url: https://poosd.dev
+  - url: https://contact-manager.poosd.dev
     description: Live application
 
 paths:
