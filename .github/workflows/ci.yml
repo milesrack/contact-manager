@@ -82,3 +82,11 @@ jobs:
 
       - name: Check frontend
         run: npm run check
+
+  deploy:
+    needs: quality
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
