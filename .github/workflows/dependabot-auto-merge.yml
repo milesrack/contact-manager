@@ -1,0 +1,76 @@
+name: Dependabot auto-merge
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    if: >-
+      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Never check out or execute pull request code in this privileged workflow.
+      - name: Verify Dependabot commit and update metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      - name: Verify and merge routine dependency updates
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          UPDATE_ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          MAINTAINER_CHANGES: ${{ steps.metadata.outputs.maintainer-changes }}
+        run: |
+          case "$UPDATE_ECOSYSTEM" in
+            npm_and_yarn|composer) ;;
+            *) exit 0 ;;
+          esac
+          case "$UPDATE_TYPE" in
+            version-update:semver-patch|version-update:semver-minor) ;;
+            *) exit 0 ;;
+          esac
+          if [ "$MAINTAINER_CHANGES" != false ]; then exit 0; fi
+
+          # Metadata verifies the first commit; only accept that single, unchanged commit.
+          commits=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits" --jq '.[].sha')
+          test "$commits" = "$PR_HEAD_SHA"
+
+          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[].filename')
+          test -n "$files"
+          while IFS= read -r file; do
+            case "$file" in
+              composer.json|composer.lock|package.json|package-lock.json) ;;
+              *) echo "Manual review required for $file"; exit 0 ;;
+            esac
+          done <<< "$files"
+
+          current_head=$(gh pr view "$PR_URL" --json headRefOid --jq .headRefOid)
+          test "$current_head" = "$PR_HEAD_SHA"
+          gh pr checks "$PR_URL" --required --watch --fail-fast --interval 10
+          current_head=$(gh pr view "$PR_URL" --json headRefOid --jq .headRefOid)
+          test "$current_head" = "$PR_HEAD_SHA"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" \
+            -f event=APPROVE -f commit_id="$PR_HEAD_SHA" >/dev/null
+          gh pr merge "$PR_URL" --rebase --match-head-commit "$PR_HEAD_SHA"
+
+          # GITHUB_TOKEN merges do not emit push workflows; dispatch main CI for deployment.
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref main

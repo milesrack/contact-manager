@@ -5,13 +5,28 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      composer-routine:
+        update-types: [minor, patch]
+      composer-security:
+        applies-to: security-updates
+        update-types: [minor, patch]
 
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    groups:
+      npm-routine:
+        update-types: [minor, patch]
+      npm-security:
+        applies-to: security-updates
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      actions-routine:
+        update-types: [minor, patch]

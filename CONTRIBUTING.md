@@ -80,6 +80,28 @@ Each pull request must:
 
 Keep branches up to date with `main` and use rebase merging.
 
+### Automated Dependency Updates
+
+Dependabot groups weekly Composer and npm patch/minor updates, including security
+fixes. The auto-merge workflow accepts only Dependabot-triggered updates with a
+single verified Dependabot commit and changes to the root dependency manifests
+and lockfiles. Eligible updates merge after the required `Quality` check passes;
+audits, tests and other branch
+protections still apply. This is the exception to the teammate review requirement
+above. Major updates, GitHub Actions updates and changes to other files require
+manual review. GitHub Actions version updates are grouped monthly.
+
+After an automated merge, the workflow explicitly dispatches CI on `main` so the
+normal deployment runs. GitHub suppresses push-triggered workflows for merges
+made with `GITHUB_TOKEN`.
+
+The repository must allow GitHub Actions to approve pull requests. Keep one
+required approval and dismissal of stale approvals enabled, but leave the
+additional last-push approval requirement disabled so the automation's approval
+can satisfy the review rule. Keep `Quality` required and require branches to be
+up to date before merging. Do not give the workflow a ruleset bypass or a personal
+access token.
+
 ## Local Development
 
 Follow [Getting Started](README.md#getting-started) for local setup.
@@ -149,7 +171,7 @@ npm run check
 ```
 
 - `composer check`: PHP syntax, formatting, static analysis, and tests.
-- `npm run check`: JavaScript linting, formatting, and the CSS build.
+- `npm run check`: JavaScript linting, formatting, workflow guard tests, and the CSS build.
 
 To format files:
 
