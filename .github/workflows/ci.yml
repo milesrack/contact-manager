@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -61,6 +62,11 @@ jobs:
 
       - name: Install JavaScript tooling
         run: npm ci
+
+      - name: Audit dependencies
+        run: |
+          composer audit --locked
+          npm audit
 
       - name: Apply database migrations
         env:
