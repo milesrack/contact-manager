@@ -119,4 +119,15 @@ jobs:
       - name: Verify deployment
         env:
           DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
-        run: curl --fail --location --silent --show-error "https://$DEPLOY_DOMAIN/" >/dev/null
+        run: |
+          login_status=$(curl --silent --show-error --max-time 30 \
+            --output /tmp/contact-manager-login.html --write-out '%{http_code}' \
+            "https://$DEPLOY_DOMAIN/login")
+          test "$login_status" = 200
+          grep -Fq '<title>Log in | Contact Manager</title>' /tmp/contact-manager-login.html
+
+          contacts_status=$(curl --silent --show-error --max-time 30 \
+            --output /tmp/contact-manager-contacts.json --write-out '%{http_code}' \
+            "https://$DEPLOY_DOMAIN/api/contacts")
+          test "$contacts_status" = 401
+          jq --exit-status '.error == "Missing or expired session"' /tmp/contact-manager-contacts.json
