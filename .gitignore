@@ -18,3 +18,4 @@ npm-debug.log*
 Thumbs.db
 
 /public/assets/css/app.css
+/output/

@@ -5,3 +5,5 @@ coverage/
 composer.lock
 package-lock.json
 **/*.php
+output/
+presentation/
