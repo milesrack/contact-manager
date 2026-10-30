@@ -15,7 +15,7 @@
     "guzzlehttp/guzzle": "^8.2.0",
     "php-parallel-lint/php-parallel-lint": "^1.4",
     "phpstan/phpstan": "^2.0",
-    "phpunit/phpunit": "^12.5"
+    "phpunit/phpunit": "^13.4"
   },
   "autoload": {
     "psr-4": {
