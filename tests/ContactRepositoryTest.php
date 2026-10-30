@@ -70,6 +70,7 @@ final class ContactRepositoryTest extends TestCase
 
         $contact = $statement->fetch(PDO::FETCH_ASSOC);
 
+        self::assertIsArray($contact);
         self::assertSame($userId, (int) $contact['user_id']);
         self::assertSame('John', $contact['first_name']);
         self::assertSame('Smith', $contact['last_name']);
@@ -112,6 +113,7 @@ final class ContactRepositoryTest extends TestCase
 
         $contact = $statement->fetch(PDO::FETCH_ASSOC);
 
+        self::assertIsArray($contact);
         self::assertSame('Jonathan', $contact['first_name']);
         self::assertSame('Smith', $contact['last_name']);
         self::assertSame('New Company', $contact['company']);
@@ -314,6 +316,7 @@ final class ContactRepositoryTest extends TestCase
 
         $contact = $statement->fetch(PDO::FETCH_ASSOC);
 
+        self::assertIsArray($contact);
         self::assertNull($contact['company']);
         self::assertNull($contact['email']);
     }
