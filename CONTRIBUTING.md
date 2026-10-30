@@ -92,8 +92,14 @@ above. Major updates, GitHub Actions updates and changes to other files require
 manual review. GitHub Actions version updates are grouped monthly.
 
 After an automated merge, the workflow explicitly dispatches CI on `main` so the
-normal deployment runs. GitHub suppresses push-triggered workflows for merges
-made with `GITHUB_TOKEN`.
+normal deployment runs. CI calls the deployment workflow directly after successful
+quality checks on `main`. GitHub suppresses push-triggered workflows for merges
+made with `GITHUB_TOKEN`. The production environment permits only the `main`
+branch.
+
+Composer resolves dependencies against PHP 8.3 through `config.platform.php`.
+Update that target only when the documented and deployed PHP runtime is upgraded;
+PHPUnit 13 requires PHP 8.4 and is outside the current supported platform.
 
 The repository must allow GitHub Actions to approve pull requests. Keep one
 required approval and dismissal of stale approvals enabled, but leave the
