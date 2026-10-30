@@ -129,6 +129,69 @@ sudo systemctl restart apache2
 
 Navigate to [http://localhost](http://localhost).
 
+## Production Deployment
+
+Contact Manager owns `contact-manager.poosd.dev`. The apex domain `poosd.dev`
+and the other subdomains belong to separate applications on the shared server.
+Do not add them as aliases to Contact Manager's virtual hosts.
+
+GitHub Actions deploys successful `main` CI builds using the `production`
+environment. Configure these environment variables:
+
+| Variable             | Value                                              |
+| -------------------- | -------------------------------------------------- |
+| `DEPLOY_DOMAIN`      | `contact-manager.poosd.dev`                        |
+| `DEPLOY_HOST`        | The server's SSH hostname or IP address            |
+| `DEPLOY_KNOWN_HOSTS` | The server's verified SSH host key (`known_hosts`) |
+
+Store the deploy user's private key in the `DEPLOY_SSH_KEY` environment secret.
+The repository website should be `https://contact-manager.poosd.dev`.
+
+Releases live in `/var/www/contact-manager/releases/<commit-sha>`;
+`/var/www/contact-manager/current` points to the active release. Keep the runtime
+environment in `/var/www/contact-manager/shared/.env` with
+`APP_ENV=production` and `APP_URL=https://contact-manager.poosd.dev`. Keep database
+credentials out of Git. The deploy user also needs read access to
+`/etc/contact-manager/migration.env` for database migrations.
+
+### Apache and TLS
+
+Point the subdomain's DNS to the deployment server. Its HTTP virtual host serves
+ACME challenges from `/var/www/letsencrypt` and redirects other requests to the
+same subdomain over HTTPS. Install the HTTP configuration first:
+
+```bash
+sudo install -d -m 755 /var/www/letsencrypt/.well-known/acme-challenge
+sudo install -m 644 deploy/apache/contact-manager.conf /etc/apache2/sites-available/contact-manager.conf
+sudo a2ensite contact-manager
+sudo apache2ctl configtest
+sudo systemctl reload apache2
+```
+
+Issue a dedicated certificate before enabling the HTTPS virtual host:
+
+```bash
+sudo certbot certonly --webroot -w /var/www/letsencrypt \
+  --cert-name contact-manager.poosd.dev -d contact-manager.poosd.dev \
+  --deploy-hook 'systemctl reload apache2'
+sudo install -m 644 deploy/apache/contact-manager-le-ssl.conf /etc/apache2/sites-available/contact-manager-le-ssl.conf
+sudo a2ensite contact-manager-le-ssl
+sudo apache2ctl configtest
+sudo systemctl reload apache2
+sudo certbot renew --cert-name contact-manager.poosd.dev --dry-run
+```
+
+When migrating an existing installation, disable its previous Contact Manager
+virtual hosts before reloading so each hostname has only one enabled HTTP and
+HTTPS virtual host. Keep the other applications' sites and certificates enabled.
+Apache configuration changes require these administrator steps; the deployment
+workflow uploads application releases only.
+
+Deployment verification requires `/login` to return the Contact Manager login
+page with HTTP 200 and `/api/contacts` to return the unauthenticated JSON error
+with HTTP 401. It does not follow redirects, so a redirect to another application
+cannot pass the checks.
+
 ## Project Structure
 
 ```text
