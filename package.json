@@ -23,5 +23,8 @@
   },
   "allowScripts": {
     "@parcel/watcher@2.5.1": true
+  },
+  "overrides": {
+    "minimatch": "^11.0.3"
   }
 }

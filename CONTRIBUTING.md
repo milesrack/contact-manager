@@ -101,6 +101,10 @@ Composer resolves dependencies against PHP 8.3 through `config.platform.php`.
 Update that target only when the documented and deployed PHP runtime is upgraded;
 PHPUnit 13 requires PHP 8.4 and is outside the current supported platform.
 
+The minimatch override keeps ESLint's transitive dependencies clear of
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+Remove it once ESLint and its configuration package require a patched version.
+
 The repository must allow GitHub Actions to approve pull requests. Keep one
 required approval and dismissal of stale approvals enabled, but leave the
 additional last-push approval requirement disabled so the automation's approval
